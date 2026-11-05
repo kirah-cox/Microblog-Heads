@@ -1,4 +1,7 @@
 using microblog_heads.Components;
+using Microsoft.EntityFrameworkCore;
+
+DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +10,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+builder.Services.AddDbContextFactory<microblog_heads.Data.AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

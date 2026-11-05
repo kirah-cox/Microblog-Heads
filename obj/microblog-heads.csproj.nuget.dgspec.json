@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\kirah.cox\\Code\\backend\\microblog-heads\\microblog-heads.csproj": {}
+    "C:\\Users\\kirah\\Code\\SE3820\\Microblog-Heads\\microblog-heads.csproj": {}
   },
   "projects": {
-    "C:\\Users\\kirah.cox\\Code\\backend\\microblog-heads\\microblog-heads.csproj": {
+    "C:\\Users\\kirah\\Code\\SE3820\\Microblog-Heads\\microblog-heads.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\kirah.cox\\Code\\backend\\microblog-heads\\microblog-heads.csproj",
+        "projectUniqueName": "C:\\Users\\kirah\\Code\\SE3820\\Microblog-Heads\\microblog-heads.csproj",
         "projectName": "microblog-heads",
-        "projectPath": "C:\\Users\\kirah.cox\\Code\\backend\\microblog-heads\\microblog-heads.csproj",
-        "packagesPath": "C:\\Users\\kirah.cox\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\kirah.cox\\Code\\backend\\microblog-heads\\obj\\",
+        "projectPath": "C:\\Users\\kirah\\Code\\SE3820\\Microblog-Heads\\microblog-heads.csproj",
+        "packagesPath": "C:\\Users\\kirah\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\kirah\\Code\\SE3820\\Microblog-Heads\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\kirah.cox\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\kirah\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -53,11 +53,33 @@
           "framework": "net10.0",
           "targetAlias": "net10.0",
           "dependencies": {
+            "DotNetEnv": {
+              "target": "Package",
+              "version": "[3.2.0, )"
+            },
             "Microsoft.AspNetCore.App.Internal.Assets": {
               "suppressParent": "All",
               "target": "Package",
               "version": "[10.0.11, )",
               "autoReferenced": true
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[10.0.14, )"
+            },
+            "Microsoft.EntityFrameworkCore.InMemory": {
+              "target": "Package",
+              "version": "[10.0.14, )"
+            },
+            "Microsoft.EntityFrameworkCore.SqlServer": {
+              "target": "Package",
+              "version": "[10.0.14, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[10.0.3, )"
             }
           },
           "imports": [
