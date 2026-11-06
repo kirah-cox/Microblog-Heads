@@ -1,4 +1,8 @@
 using microblog_heads.Components;
+using microblog_heads.Data;
+using microblog_heads.Models;
+using microblog_heads.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
 DotNetEnv.Env.Load();
@@ -9,10 +13,26 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-var app = builder.Build();
+builder.Services.AddDataProtection()
+    .SetApplicationName("Microblog-Heads");
 
-builder.Services.AddDbContextFactory<microblog_heads.Data.AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+// Build the connection string from the values loaded out of .env
+var connStr = $"Host={Environment.GetEnvironmentVariable("DB_HOST")};" +
+              $"Port={Environment.GetEnvironmentVariable("DB_PORT")};" +
+              $"Database={Environment.GetEnvironmentVariable("DB_NAME")};" +
+              $"Username={Environment.GetEnvironmentVariable("DB_USER")};" +
+              $"Password={Environment.GetEnvironmentVariable("DB_PASSWORD")};";
+
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
+    options.UseNpgsql(connStr));
+
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<PostService>();
+builder.Services.AddScoped<CommentService>();
+builder.Services.AddScoped<CommunityService>();
+builder.Services.AddScoped<HashTagService>();
+
+var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

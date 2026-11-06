@@ -1,7 +1,51 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@using microblog_heads.Services;
+@inject UserService UserService
 
 <PageTitle>Home</PageTitle>
 
 <h1>Hello, world!</h1>
 
 Welcome to your new app.
+
+<h3>Test User:</h3>
+firstName: @firstName <br />
+lastName: @lastName <br />
+email: @email <br />
+username: @username <br />
+password: @password <br />
+
+<button @onclick="AddUser">Add Test User</button>
+
+@if (isVisible)
+{
+    <h3>User List:</h3>
+    @foreach (Models.RegularUser user in userList)
+    {
+        <p>@user.FirstName @user.LastName - @user.Email - @user.Username</p>
+    }
+}
+
+@code
+{
+    private string firstName = "testuser";
+    private string lastName = "test";
+    private string email = "test@example.com";
+    private string username = "testuser";
+    private string password = "password";
+    private List<Models.RegularUser> userList = new List<Models.RegularUser>();
+    private bool isVisible = false;
+
+    private async Task AddUser()
+    {
+        await UserService.AddUserAsync(firstName: firstName, lastName: lastName, email: email, username: username, password: password);
+        await ListUsers();
+    }
+
+    private async Task ListUsers()
+    {
+        userList = await UserService.GetAllUsersAsync();
+        isVisible = true;
+    }
+}
