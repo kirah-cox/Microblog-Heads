@@ -26,4 +26,61 @@ public class PostService
             .Where(p => p.RegularUserId == userId)
             .ToListAsync();
     }
+
+    public async Task<Post> CreatePostAsync(int userId, string content, int? communityId = null)
+    {
+        content = content?.Trim() ?? ""; // optional, we may wish to keep white space in later versions
+        if (content.Length == 0) 
+            throw new ArgumentException("A post cannot be empty");
+        if (content.Length > 500) 
+            throw new ArgumentException("A post cannot exceed 500 characters");
+
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var post = new Post
+        {
+            RegularUserId = userId,
+            Content = content,
+            DatePosted = DateOnly.FromDateTime(DateTime.UtcNow),
+            CommunityId = communityId
+        };
+        try 
+        {
+            db.Posts.Add(post);
+            await db.SaveChangesAsync();    
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new InvalidOperationException("Could not save the post. Does user (or community) exist?", ex);
+        }
+        return post;
+    }
+
+    public async Task<bool> ToggleLikePostAsync (int userId, int postId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var existing = await db.PostLikes.FirstOrDefaultAsync(l => l.RegularUserId == userId && l.PostId == postId);
+        if (existing is not null)
+        {
+            db.PostLikes.Remove(existing);
+            await db.SaveChangesAsync();
+
+            return false; // if a like exists, we are 'unliking'the post
+        }
+
+        var like = new PostLike
+        {
+            RegularUserId = userId,
+            PostId = postId
+        };
+
+        db.PostLikes.Add(like);
+                   
+        await db.SaveChangesAsync();
+
+        return true;
+    }
+
+    
 }
