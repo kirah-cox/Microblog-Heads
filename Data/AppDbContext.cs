@@ -82,6 +82,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.ParentCommentId).HasColumnName("parent_comment_id");
             entity.Property(e => e.PostId).HasColumnName("post_id");
             entity.Property(e => e.RegularUserId).HasColumnName("regular_user_id");
+            entity.Property(e => e.DatePosted).HasColumnName("date_posted").HasColumnType("timestamp without time zone");
 
             entity.HasOne(d => d.Post).WithMany(p => p.Comments)
                 .HasForeignKey(d => d.PostId)
@@ -274,8 +275,8 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.CommunityId).HasColumnName("community_id");
             entity.Property(e => e.Content)
                 .HasMaxLength(500)
-                .HasColumnName("content");
-            entity.Property(e => e.DatePosted).HasColumnName("date_posted");
+                .HasColumnName("content");            
+            entity.Property(e => e.DatePosted).HasColumnName("date_posted").HasColumnType("timestamp without time zone");
             entity.Property(e => e.ParentPostId).HasColumnName("parent_post_id");
             entity.Property(e => e.RegularUserId).HasColumnName("regular_user_id");
 

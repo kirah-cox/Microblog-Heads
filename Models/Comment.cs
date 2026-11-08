@@ -15,6 +15,8 @@ public partial class Comment
 
     public string? Content { get; set; }
 
+    public DateTime DatePosted { get; set; }
+
     public virtual ICollection<CommentLike> CommentLikes { get; set; } = new List<CommentLike>();
 
     public virtual ICollection<CommentMissuse> CommentMissuses { get; set; } = new List<CommentMissuse>();

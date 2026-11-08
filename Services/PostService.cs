@@ -41,7 +41,7 @@ public class PostService
         {
             RegularUserId = userId,
             Content = content,
-            DatePosted = DateOnly.FromDateTime(DateTime.UtcNow),
+            DatePosted = DateTime.UtcNow,
             CommunityId = communityId
         };
         try 

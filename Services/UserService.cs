@@ -31,7 +31,7 @@ public class UserService
         return await db.RegularUsers.ToListAsync();
     }
 
-    public async Task AddUserAsync(string firstName, string lastName, string email, string username, string password)
+    public async Task CreateUserAccountAsync(string firstName, string lastName, string email, string username, string password)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
 
@@ -53,5 +53,136 @@ public class UserService
         {
             throw new Exception("An error occurred while adding the user.", ex);
         }
+    }
+
+    public async Task<RegularUser> RegularUserLoginAsync(string username, string password)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var user = await db.RegularUsers.FirstOrDefaultAsync(u => u.Username == username && u.Password == password);
+        if (user == null)
+        {
+            throw new Exception("Invalid username or password.");
+        }
+        return user;
+    }
+
+    public async Task FollowUserAsync(int followerId, int followingId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var follower = await db.RegularUsers.FindAsync(followerId);
+        var following = await db.RegularUsers.FindAsync(followingId);
+
+        if (follower == null || following == null)
+        {
+            throw new Exception("Follower or followee not found.");
+        }
+
+        var newFollower = new Follower
+        {
+            RegularUserFollowerId = followerId,
+            RegularUserFollowingId = followingId
+        };
+
+        try
+        {
+            db.Followers.Add(newFollower);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new Exception("An error occurred while adding the follower.", ex);
+        }
+    }
+
+    public async Task UnfollowUserAsync(int followerId, int followingId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var follower = await db.Followers.FirstOrDefaultAsync(f => f.RegularUserFollowerId == followerId && f.RegularUserFollowingId == followingId);
+
+        if (follower == null)
+        {
+            throw new Exception("Follower relationship not found.");
+        }
+
+        try
+        {
+            db.Followers.Remove(follower);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new Exception("An error occurred while removing the follower.", ex);
+        }
+    }
+
+    public async Task<List<RegularUser>> GetFollowersAsync(int userId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.Followers
+            .Where(f => f.RegularUserFollowingId == userId)
+            .Select(f => f.RegularUserFollower)
+            .ToListAsync();
+    }
+
+    public async Task BlockUserAsync(int blockingId, int blockedId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var follower = await db.RegularUsers.FindAsync(blockingId);
+        var following = await db.RegularUsers.FindAsync(blockedId);
+
+        if (follower == null || following == null)
+        {
+            throw new Exception("Follower or followee not found.");
+        }
+
+        var newBlocked = new BlockedUser
+        {
+            RegularUserBlockingId = blockingId,
+            RegularUserBlockedId = blockedId
+        };
+
+        try
+        {
+            db.BlockedUsers.Add(newBlocked);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new Exception("An error occurred while adding the blocked user.", ex);
+        }
+    }
+
+    public async Task UnblockUserAsync(int blockingId, int blockedId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var blockedUser = await db.BlockedUsers.FirstOrDefaultAsync(b => b.RegularUserBlockingId == blockingId && b.RegularUserBlockedId == blockedId);
+
+        if (blockedUser == null)
+        {
+            throw new Exception("Blocked user relationship not found.");
+        }
+
+        try
+        {
+            db.BlockedUsers.Remove(blockedUser);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new Exception("An error occurred while removing the blocked user.", ex);
+        }
+    }
+
+    public async Task<List<RegularUser>> GetBlockedUsersAsync(int userId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.BlockedUsers
+            .Where(b => b.RegularUserBlockingId == userId)
+            .Select(b => b.RegularUserBlocked)
+            .ToListAsync();
     }
 }

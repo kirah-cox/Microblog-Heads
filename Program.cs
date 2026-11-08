@@ -31,8 +31,17 @@ builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<CommunityService>();
 builder.Services.AddScoped<HashTagService>();
+builder.Services.AddScoped<DisplayService>();
 
 var app = builder.Build();
+
+// Apply any pending EF Core migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+    using var db = factory.CreateDbContext();
+    db.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
