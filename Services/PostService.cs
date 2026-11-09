@@ -82,5 +82,33 @@ public class PostService
         return true;
     }
 
+    public async Task<Post> CreateRepostAsync (int userId, int originalPostId, string content, int? communityId = null)
+    {
+        content = content?.Trim() ?? ""; // this is less optional for repost as we may have no comment, just a repost.
+        
+        if (content.Length > 500) 
+            throw new ArgumentException("A post cannot exceed 500 characters");
+
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var post = new Post
+        {
+            RegularUserId = userId,
+            ParentPostId = originalPostId,
+            Content = content,
+            DatePosted = DateOnly.FromDateTime(DateTime.UtcNow),
+            CommunityId = communityId
+        };
+        try 
+        {
+            db.Posts.Add(post);
+            await db.SaveChangesAsync();    
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new InvalidOperationException("Could not save the post. Does user (or community) exist?", ex);
+        }
+        return post;
+    }
     
 }
