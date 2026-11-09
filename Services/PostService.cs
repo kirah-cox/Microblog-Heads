@@ -96,7 +96,7 @@ public class PostService
             RegularUserId = userId,
             ParentPostId = originalPostId,
             Content = content,
-            DatePosted = DateOnly.FromDateTime(DateTime.UtcNow),
+            DatePosted = DateTime.UtcNow,
             CommunityId = communityId
         };
         try 
@@ -106,7 +106,7 @@ public class PostService
         }
         catch (DbUpdateException ex)
         {
-            throw new InvalidOperationException("Could not save the post. Does user (or community) exist?", ex);
+            throw new InvalidOperationException("Could not save the repost. Do the user, original post, and community exist?", ex);
         }
         return post;
     }
