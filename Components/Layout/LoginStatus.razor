@@ -4,7 +4,7 @@
 
 @if (CurrentUser.IsLoggedIn)
 {
-    <span class="text-muted">Signed in as <strong>@CurrentUser.User!.Username</strong></span>
+    <span class="text-muted">Signed in as <a href="profile" class="fw-semibold ms-0">@CurrentUser.User!.Username</a></span>
     <button class="btn btn-link p-0" @onclick="LogoutAsync">Log out</button>
 }
 else if (CurrentUser.IsInitialized)

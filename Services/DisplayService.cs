@@ -137,7 +137,7 @@ public class DisplayService
         return posts;
     }
 
-    public async Task<List<Post>> GetForYouPostsbyUserIDAsync(int userID)
+    public async Task<List<Post>> GetAllFollowingPostsbyUserIDAsync(int userID)
     {
         var followedPosts = await GetAllFollowedPostsbyUserIDAsync(userID);
         var followedUserPosts = await GetAllFollowedUserPostsbyUserIDAsync(userID);
@@ -151,6 +151,29 @@ public class DisplayService
             .DistinctBy(p => p.Id)
             .OrderByDescending(x => x.DatePosted)
             .ToList();
+    }
+
+    public async Task<List<Post>> GetForYouPostsbyUserIDAsync(int userID, int count = 20)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var blockedIds = await GetBlockedUserIdsAsync(db, userID);
+
+        var posts = await db.Posts
+            .Where(x => x.RegularUserId != userID)
+            .Where(x => !blockedIds.Contains(x.RegularUserId))
+            .OrderBy(x => EF.Functions.Random())
+            .Take(count)
+            .Include(x => x.RegularUser)
+            .Include(x => x.PostLikes)
+            .Include(x => x.PostFollows)
+            .Include(x => x.PostHashTags)
+                .ThenInclude(pht => pht.HashTag)
+            .Include(x => x.Comments)
+                .ThenInclude(c => c.RegularUser)
+            .ToListAsync();
+
+        RemoveBlockedComments(posts, blockedIds);
+        return posts;
     }
 
     private static async Task<List<int>> GetBlockedUserIdsAsync(AppDbContext db, int userID)

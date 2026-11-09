@@ -1,0 +1,55 @@
+.profile {
+    max-width: 720px;
+}
+
+.avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 50%;
+    color: #fff;
+    font-weight: 600;
+    background-image: linear-gradient(135deg, rgb(5, 39, 103) 0%, #3a0647 100%);
+    user-select: none;
+}
+
+.avatar-lg {
+    width: 96px;
+    height: 96px;
+    font-size: 2rem;
+}
+
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    font-size: 0.9rem;
+}
+
+.post {
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+    .post:hover {
+        box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+    }
+
+.post-content {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.comments {
+    border-top: 1px solid #e9ecef;
+    padding-top: 0.75rem;
+}
+
+.comment {
+    padding: 0.4rem 0;
+    overflow-wrap: anywhere;
+}
+
+    .comment.reply {
+        border-left: 2px solid #dee2e6;
+        padding-left: 0.75rem;
+    }

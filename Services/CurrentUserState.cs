@@ -16,6 +16,7 @@ public class CurrentUserState
     private readonly ProtectedSessionStorage _storage;
     private readonly UserService _userService;
     private bool _initialized;
+    private Task? _initTask;
 
     public CurrentUserState(ProtectedSessionStorage storage, UserService userService)
     {
@@ -36,13 +37,18 @@ public class CurrentUserState
     /// available once the component is interactive, so call this from
     /// OnAfterRenderAsync(firstRender: true).
     /// </summary>
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
+        // Several components may call this at once; share a single in-flight load.
         if (_initialized)
         {
-            return;
+            return Task.CompletedTask;
         }
+        return _initTask ??= InitializeCoreAsync();
+    }
 
+    private async Task InitializeCoreAsync()
+    {
         try
         {
             var result = await _storage.GetAsync<int>(StorageKey);

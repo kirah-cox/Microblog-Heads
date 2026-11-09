@@ -1,0 +1,271 @@
+@page "/profile"
+@page "/profile/{Username}"
+@rendermode InteractiveServer
+@implements IDisposable
+@using microblog_heads.Models
+@inject UserService UserService
+@inject DisplayService DisplayService
+@inject CurrentUserState CurrentUser
+
+<PageTitle>@(profileUser is null ? "Profile" : $"{profileUser.FirstName} {profileUser.LastName} (@{profileUser.Username})")</PageTitle>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center mt-5">
+        <div class="spinner-border text-secondary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (needsLogin)
+{
+    <div class="alert alert-info mt-4">
+        <a href="login">Log in</a> to see your profile, or <a href="register">create an account</a>.
+    </div>
+}
+else if (profileUser is null)
+{
+    <div class="alert alert-warning mt-4">
+        No user named <strong>@Username</strong> was found.
+    </div>
+}
+else
+{
+    <div class="profile mx-auto">
+        <section class="card shadow-sm mb-4">
+            <div class="card-body p-4 d-flex flex-column flex-sm-row align-items-center align-items-sm-start gap-4">
+                <div class="avatar avatar-lg" aria-hidden="true">@Initials(profileUser)</div>
+
+                <div class="flex-fill text-center text-sm-start">
+                    <h1 class="h3 mb-0">@profileUser.FirstName @profileUser.LastName</h1>
+                    <div class="text-muted mb-2">@@@profileUser.Username</div>
+
+                    @if (IsOwnProfile)
+                    {
+                        <div class="small text-muted mb-3">@profileUser.Email</div>
+                    }
+
+                    <div class="d-flex justify-content-center justify-content-sm-start gap-4">
+                        <div><strong>@posts.Count</strong> <span class="text-muted">@(posts.Count == 1 ? "post" : "posts")</span></div>
+                        <div><strong>@followerCount</strong> <span class="text-muted">@(followerCount == 1 ? "follower" : "followers")</span></div>
+                        <div><strong>@totalLikes</strong> <span class="text-muted">@(totalLikes == 1 ? "like" : "likes")</span></div>
+                    </div>
+                </div>
+
+                @if (IsOwnProfile)
+                {
+                    <span class="badge rounded-pill text-bg-light border align-self-center align-self-sm-start">This is you</span>
+                }
+            </div>
+        </section>
+
+        <h2 class="h5 mb-3">Posts</h2>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+        else if (posts.Count == 0)
+        {
+            <div class="text-muted text-center py-5 border rounded bg-light">
+                @(IsOwnProfile ? "You haven't posted anything yet." : $"@{profileUser.Username} hasn't posted anything yet.")
+            </div>
+        }
+        else
+        {
+            @foreach (var post in posts)
+            {
+                <article class="card post mb-3" @key="post.Id">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <div class="avatar avatar-sm" aria-hidden="true">@Initials(profileUser)</div>
+                            <div class="lh-sm">
+                                <strong>@profileUser.FirstName @profileUser.LastName</strong>
+                                <span class="text-muted">@@@profileUser.Username</span>
+                                <div class="small text-muted">@FormatDate(post.DatePosted)</div>
+                            </div>
+                            @if (post.ParentPostId is not null)
+                            {
+                                <span class="badge text-bg-secondary ms-auto">Repost</span>
+                            }
+                        </div>
+
+                        <p class="post-content mb-2">@post.Content</p>
+
+                        @if (post.PostHashTags.Count > 0)
+                        {
+                            <div class="mb-2">
+                                @foreach (var tag in post.PostHashTags)
+                                {
+                                    <span class="badge rounded-pill text-bg-primary bg-opacity-75 me-1">#@tag.HashTag.Name</span>
+                                }
+                            </div>
+                        }
+
+                        <div class="d-flex gap-3 small text-muted">
+                            <span>♥ @post.PostLikes.Count @(post.PostLikes.Count == 1 ? "like" : "likes")</span>
+                            @if (post.Comments.Count > 0)
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" @onclick="() => ToggleComments(post.Id)">
+                                    💬 @post.Comments.Count @(post.Comments.Count == 1 ? "comment" : "comments")
+                                    @(expandedPosts.Contains(post.Id) ? "▴" : "▾")
+                                </button>
+                            }
+                            else
+                            {
+                                <span>💬 0 comments</span>
+                            }
+                        </div>
+
+                        @if (expandedPosts.Contains(post.Id))
+                        {
+                            <ul class="list-unstyled comments mt-3 mb-0">
+                                @foreach (var comment in OrderedComments(post))
+                                {
+                                    <li class="comment @(comment.Depth > 0 ? "reply" : "")" style="margin-left: @(Math.Min(comment.Depth, 4) * 1.25)rem">
+                                        <a href="profile/@comment.Comment.RegularUser.Username" class="fw-semibold text-decoration-none">@@@comment.Comment.RegularUser.Username</a>
+                                        <span class="small text-muted ms-1">@FormatDate(comment.Comment.DatePosted)</span>
+                                        <div>@comment.Comment.Content</div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </article>
+            }
+        }
+    </div>
+}
+
+@code {
+    /// <summary>Username from the URL; when omitted the signed-in user's profile is shown.</summary>
+    [Parameter] public string? Username { get; set; }
+
+    private RegularUser? profileUser;
+    private List<Post> posts = new();
+    private int followerCount;
+    private int totalLikes;
+    private bool isLoading = true;
+    private bool needsLogin;
+    private string? errorMessage;
+    private readonly HashSet<int> expandedPosts = new();
+
+    private bool IsOwnProfile => profileUser is not null && CurrentUser.User?.Id == profileUser.Id;
+
+    protected override void OnInitialized()
+    {
+        CurrentUser.Changed += OnCurrentUserChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Runs again when navigating between profiles (e.g. /profile/a -> /profile/b).
+        if (CurrentUser.IsInitialized)
+        {
+            await LoadAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Who is signed in lives in browser storage, which is only readable once interactive.
+        // Finishing initialization raises Changed, which triggers the load (OnCurrentUserChanged).
+        if (firstRender && !CurrentUser.IsInitialized)
+        {
+            await CurrentUser.InitializeAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        needsLogin = false;
+        errorMessage = null;
+        expandedPosts.Clear();
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Username))
+            {
+                profileUser = CurrentUser.User is null ? null : await UserService.GetUserByIdAsync(CurrentUser.User.Id);
+                needsLogin = profileUser is null;
+            }
+            else
+            {
+                profileUser = await UserService.GetUserByUsernameAsync(Username);
+            }
+
+            if (profileUser is null)
+            {
+                posts = new();
+                return;
+            }
+
+            posts = await DisplayService.GetPostsbyUserIDAsync(profileUser.Id);
+            followerCount = (await UserService.GetFollowersAsync(profileUser.Id)).Count;
+            totalLikes = posts.Sum(p => p.PostLikes.Count);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Couldn't load this profile: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnCurrentUserChanged() => InvokeAsync(async () =>
+    {
+        // Logging in/out changes what /profile shows and whether this is "your" profile.
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    private void ToggleComments(int postId)
+    {
+        if (!expandedPosts.Remove(postId))
+        {
+            expandedPosts.Add(postId);
+        }
+    }
+
+    private record CommentRow(Comment Comment, int Depth);
+
+    /// <summary>Flattens a post's comments into thread order: each comment followed by its replies.</summary>
+    private static IEnumerable<CommentRow> OrderedComments(Post post)
+    {
+        var ids = post.Comments.Select(c => c.Id).ToHashSet();
+        var children = post.Comments
+            .Where(c => c.ParentCommentId is int p && ids.Contains(p))
+            .ToLookup(c => c.ParentCommentId!.Value);
+
+        IEnumerable<CommentRow> Walk(Comment c, int depth)
+        {
+            yield return new CommentRow(c, depth);
+            foreach (var child in children[c.Id].OrderBy(x => x.DatePosted))
+            {
+                foreach (var row in Walk(child, depth + 1))
+                {
+                    yield return row;
+                }
+            }
+        }
+
+        // Top-level comments, plus any whose parent isn't in the list (treated as top-level).
+        return post.Comments
+            .Where(c => c.ParentCommentId is not int p || !ids.Contains(p))
+            .OrderBy(c => c.DatePosted)
+            .SelectMany(c => Walk(c, 0));
+    }
+
+    private static string Initials(RegularUser user) =>
+        $"{user.FirstName.FirstOrDefault()}{user.LastName.FirstOrDefault()}".ToUpperInvariant();
+
+    private static string FormatDate(DateTime date) => date.ToString("MMM d, yyyy · h:mm tt");
+
+    public void Dispose()
+    {
+        CurrentUser.Changed -= OnCurrentUserChanged;
+    }
+}
