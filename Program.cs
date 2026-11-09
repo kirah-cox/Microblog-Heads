@@ -32,6 +32,7 @@ builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<CommunityService>();
 builder.Services.AddScoped<HashTagService>();
 builder.Services.AddScoped<DisplayService>();
+builder.Services.AddScoped<CurrentUserState>();
 
 var app = builder.Build();
 
