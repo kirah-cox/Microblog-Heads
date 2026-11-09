@@ -41,7 +41,7 @@ public class CommentService
         {
             RegularUserId = userId,
             Content = content,
-            // DatePosted = DateOnly.FromDateTime(DateTime.UtcNow), // Comment doesn't have a date field currently
+            DatePosted = DateTime.UtcNow,
             // CommunityId = communityId // Comment doesn't have a community field
             PostId = postId,
             ParentCommentId = commentId

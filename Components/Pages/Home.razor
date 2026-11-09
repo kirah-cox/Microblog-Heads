@@ -39,7 +39,7 @@ password: @password <br />
 
     private async Task AddUser()
     {
-        await UserService.AddUserAsync(firstName: firstName, lastName: lastName, email: email, username: username, password: password);
+        await UserService.CreateUserAccountAsync(firstName: firstName, lastName: lastName, email: email, username: username, password: password);
         await ListUsers();
     }
 
