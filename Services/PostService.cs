@@ -41,7 +41,7 @@ public class PostService
         {
             RegularUserId = userId,
             Content = content,
-            DatePosted = DateTime.UtcNow,
+            DatePosted = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), // column is "timestamp without time zone"; Npgsql rejects Kind=Utc
             CommunityId = communityId
         };
         try 
@@ -131,7 +131,7 @@ public class PostService
             RegularUserId = userId,
             ParentPostId = originalPostId,
             Content = content,
-            DatePosted = DateTime.UtcNow,
+            DatePosted = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), // column is "timestamp without time zone"; Npgsql rejects Kind=Utc
             CommunityId = communityId
         };
         try 

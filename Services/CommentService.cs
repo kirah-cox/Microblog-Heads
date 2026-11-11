@@ -41,7 +41,7 @@ public class CommentService
         {
             RegularUserId = userId,
             Content = content,
-            DatePosted = DateTime.UtcNow,
+            DatePosted = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), // column is "timestamp without time zone"; Npgsql rejects Kind=Utc
             // CommunityId = communityId // Comment doesn't have a community field
             PostId = postId,
             ParentCommentId = commentId
