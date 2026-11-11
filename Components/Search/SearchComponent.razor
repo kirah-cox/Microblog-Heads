@@ -1,14 +1,16 @@
-@using microblog_heads.Services
+@using System.Net.Quic
 @using microblog_heads.Models
+@using microblog_heads.Services
 @inject UserService UserService
 @inject HashTagService HashTagService
+@inject CommunityService CommunityService
 @inject NavigationManager Navigation
 
 <div class="search-container">
-    <input type="text" class="search-input" placeholder="Search users, hashtags..." @oninput="OnSearchInput"
+    <input type="text" class="search-input" placeholder="Search users, communities, hashtags..." @oninput="OnSearchInput"
            @onfocus="OnFocus" @onblur="OnBlur" />
 
-    @if (showResults && (searchUsers.Any() || searchHashTags.Any()))
+    @if (showResults && (searchUsers.Any() || searchHashTags.Any() || searchCommunity.Any()))
     {
         <div class="search-results">
             @* Users Section *@
@@ -40,6 +42,21 @@
                     }
                 </div>
             }
+
+            @* Community Section *@
+            @if (searchCommunity.Any())
+            {
+                <div class="results-section">
+                    <div class="results-header">Communities</div>
+                    @foreach (var community in searchCommunity)
+                    {
+                        <div class="search-result-item" @onclick="() => GoToCommunity(community.Id)">
+                            <span>#@community.Name</span>
+                        </div>
+                    }
+                </div>
+            }
+
         </div>
     }
 </div>
@@ -48,9 +65,14 @@
     private string searchQuery = "";
     private List<RegularUser> searchUsers = new();
     private List<HashTag> searchHashTags = new();
+    private List<Community> searchCommunity = new();
     private bool showResults = false;
     private List<RegularUser> allUsers = new();
     private List<HashTag> allHashTags = new();
+
+    private List<Community> allCommunities = new();
+
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -59,6 +81,11 @@
 
         // Load all hashtags from the database
         allHashTags = await HashTagService.GetAllHashTagsAsync();
+
+        //load all communities from the database 
+        allCommunities = await CommunityService.GetAllCommunitiesAsync();
+
+        Console.WriteLine(allCommunities);
 
     }
 
@@ -70,6 +97,7 @@
         {
             searchUsers.Clear();
             searchHashTags.Clear();
+            searchCommunity.Clear();
             return;
         }
 
@@ -86,6 +114,12 @@
         // Search HashTags
         searchHashTags = allHashTags
             .Where(h => h.Name.ToLower().Contains(query))
+            .Take(3)
+            .ToList();
+
+        //search comminities
+        searchCommunity = allCommunities
+            .Where(c => c.Name.ToLower().Contains(query))
             .Take(3)
             .ToList();
     }
@@ -109,5 +143,10 @@
     private void GoToHashTag(int hashTagId)
     {
         Navigation.NavigateTo($"hashtag/{hashTagId}");
+    }
+
+    private void GoToCommunity(int communityId)
+    {
+        Navigation.NavigateTo($"community/{communityId}");
     }
 }
