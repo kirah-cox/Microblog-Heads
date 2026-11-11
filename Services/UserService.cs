@@ -58,7 +58,8 @@ public class UserService
             LastName = lastName,
             Email = email,
             Username = username,
-            Password = password
+            Password = password,
+            UserRoleID = UserRole.UserRoleId
         };
 
         try

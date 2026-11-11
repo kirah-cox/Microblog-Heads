@@ -44,6 +44,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<RegularUser> RegularUsers { get; set; }
 
+    public virtual DbSet<UserRole> UserRoles { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<BlockedUser>(entity =>
@@ -407,6 +409,33 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(50)
                 .HasColumnName("username");
+            // Existing rows get the "User" role when the column is added.
+            entity.Property(e => e.UserRoleID)
+                .HasColumnName("user_role_id")
+                .HasDefaultValue(UserRole.UserRoleId);
+
+            entity.HasOne(d => d.UserRole).WithMany(p => p.RegularUsers)
+                .HasForeignKey(d => d.UserRoleID)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_regular_user_user_role");
+        });
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("user_role_pkey");
+
+            entity.ToTable("user_role", "Microblog");
+
+            entity.HasIndex(e => e.Role, "uq_user_role_role").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Role)
+                .HasMaxLength(50)
+                .HasColumnName("role");
+
+            entity.HasData(
+                new UserRole { Id = UserRole.UserRoleId, Role = "User" },
+                new UserRole { Id = UserRole.AdminRoleId, Role = "Admin" });
         });
 
         OnModelCreatingPartial(modelBuilder);

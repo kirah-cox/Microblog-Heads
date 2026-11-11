@@ -534,6 +534,12 @@ namespace microblog_heads.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("password");
 
+                    b.Property<int>("UserRoleID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("user_role_id");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -543,7 +549,45 @@ namespace microblog_heads.Migrations
                     b.HasKey("Id")
                         .HasName("regular_user_pkey");
 
+                    b.HasIndex("UserRoleID");
+
                     b.ToTable("regular_user", "Microblog");
+                });
+
+            modelBuilder.Entity("microblog_heads.Models.UserRole", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("role");
+
+                    b.HasKey("Id")
+                        .HasName("user_role_pkey");
+
+                    b.HasIndex(new[] { "Role" }, "uq_user_role_role")
+                        .IsUnique();
+
+                    b.ToTable("user_role", "Microblog");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Role = "User"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Role = "Admin"
+                        });
                 });
 
             modelBuilder.Entity("microblog_heads.Models.BlockedUser", b =>
@@ -834,6 +878,18 @@ namespace microblog_heads.Migrations
                     b.Navigation("RegularUser");
                 });
 
+            modelBuilder.Entity("microblog_heads.Models.RegularUser", b =>
+                {
+                    b.HasOne("microblog_heads.Models.UserRole", "UserRole")
+                        .WithMany("RegularUsers")
+                        .HasForeignKey("UserRoleID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_regular_user_user_role");
+
+                    b.Navigation("UserRole");
+                });
+
             modelBuilder.Entity("microblog_heads.Models.Comment", b =>
                 {
                     b.Navigation("CommentLikes");
@@ -906,6 +962,11 @@ namespace microblog_heads.Migrations
                     b.Navigation("PostMissuses");
 
                     b.Navigation("Posts");
+                });
+
+            modelBuilder.Entity("microblog_heads.Models.UserRole", b =>
+                {
+                    b.Navigation("RegularUsers");
                 });
 #pragma warning restore 612, 618
         }

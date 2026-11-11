@@ -17,6 +17,10 @@ public partial class RegularUser
 
     public string Password { get; set; } = null!;
 
+    public int UserRoleID { get; set; }
+
+    public virtual UserRole UserRole { get; set; } = null!;
+
     public virtual ICollection<BlockedUser> BlockedUserRegularUserBlockeds { get; set; } = new List<BlockedUser>();
 
     public virtual ICollection<BlockedUser> BlockedUserRegularUserBlockings { get; set; } = new List<BlockedUser>();
