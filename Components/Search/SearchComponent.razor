@@ -20,7 +20,7 @@
                     <div class="results-header">Users</div>
                     @foreach (var user in searchUsers)
                     {
-                        <div class="search-result-item" @onclick="() => GoToProfile(user.Username)">
+                        <div class="search-result-item" @onmousedown="() => GoToProfile(user.Username)" @onmousedown:preventDefault>
                             <span>@user.FirstName @user.LastName</span>
                             <span class="username">@@@user.Username</span>
                         </div>
@@ -35,7 +35,7 @@
                     <div class="results-header">Hashtags</div>
                     @foreach (var tag in searchHashTags)
                     {
-                        <div class="search-result-item" @onclick="() => GoToHashTag(tag.Id)">
+                        <div class="search-result-item" @onmousedown="() => GoToHashTag(tag.Id)" @onmousedown:preventDefault>
                             <span>#@tag.Name</span>
                             <span class="tag-count">@tag.PostHashTags.Count posts</span>
                         </div>
@@ -92,6 +92,9 @@
     private async Task OnSearchInput(ChangeEventArgs e)
     {
         searchQuery = e.Value?.ToString() ?? "";
+        // Show results while typing too: a focus that happened before the page became
+        // interactive never reached the server, so OnFocus alone is not enough.
+        showResults = true;
 
         if (string.IsNullOrWhiteSpace(searchQuery))
         {
