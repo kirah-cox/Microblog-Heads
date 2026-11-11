@@ -1,4 +1,3 @@
-@using System.Net.Quic
 @using microblog_heads.Models
 @using microblog_heads.Services
 @inject UserService UserService
@@ -50,8 +49,8 @@
                     <div class="results-header">Communities</div>
                     @foreach (var community in searchCommunity)
                     {
-                        <div class="search-result-item" @onclick="() => GoToCommunity(community.Id)">
-                            <span>#@community.Name</span>
+                        <div class="search-result-item" @onmousedown="() => GoToCommunity(community.Id)" @onmousedown:preventDefault>
+                            <span>@community.Name</span>
                         </div>
                     }
                 </div>
@@ -84,9 +83,6 @@
 
         //load all communities from the database 
         allCommunities = await CommunityService.GetAllCommunitiesAsync();
-
-        Console.WriteLine(allCommunities);
-
     }
 
     private async Task OnSearchInput(ChangeEventArgs e)
