@@ -1,48 +1,93 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">microblog-heads</a>
-    </div>
+﻿@implements IDisposable
+@inject CurrentUserState CurrentUser
+@inject NavigationManager Navigation
+
+@* Rendered interactively (see MainLayout) so the links and account panel update on log in / log out.
+   On phones it collapses into a top bar with a menu toggle. *@
+
+<div class="brand-row">
+    <a class="brand" href="">
+        <span class="brand-mark" aria-hidden="true">mh</span>
+        <span class="brand-name">Microblog Heads</span>
+    </a>
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
+    <nav class="nav-links">
+        @* Links are hidden until we know who's signed in, to avoid a flash of the wrong set. *@
+        @if (CurrentUser.IsInitialized && CurrentUser.IsLoggedIn)
+        {
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" /></svg>
+                <span>For You</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="profile">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> My Profile
+            <NavLink class="nav-link" href="following">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                <span>Following</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="profile" Match="NavLinkMatch.All">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+                <span>My Profile</span>
+            </NavLink>
+        }
+        else if (CurrentUser.IsInitialized)
+        {
             <NavLink class="nav-link" href="login">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Log in
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="m10 17 5-5-5-5M15 12H3" /></svg>
+                <span>Log in</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
             <NavLink class="nav-link" href="register">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Create Account
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg>
+                <span>Create Account</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
+        }
     </nav>
+
+    @if (CurrentUser.User is { } me)
+    {
+        @* Signed-in account, pinned to the bottom of the sidebar. *@
+        <div class="account">
+            <a href="profile" class="account-link">
+                <div class="avatar avatar-sm">@PostCard.Initials(me)</div>
+                <div class="account-text">
+                    <strong>@me.FirstName @me.LastName</strong>
+                    <span>@@@me.Username</span>
+                </div>
+            </a>
+            <button type="button" class="logout-btn" title="Log out" aria-label="Log out" @onclick="LogoutAsync" @onclick:stopPropagation="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></svg>
+            </button>
+        </div>
+    }
 </div>
 
+@code {
+    protected override void OnInitialized()
+    {
+        CurrentUser.Changed += OnUserChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CurrentUser.InitializeAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        await CurrentUser.LogoutAsync();
+        Navigation.NavigateTo("login");
+    }
+
+    private void OnUserChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        CurrentUser.Changed -= OnUserChanged;
+    }
+}

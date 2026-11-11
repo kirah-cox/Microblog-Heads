@@ -1,0 +1,29 @@
+.feed {
+    max-width: 720px;
+}
+
+.avatar-md {
+    width: 64px;
+    height: 64px;
+    font-size: 1.6rem;
+}
+
+.min-w-0 {
+    min-width: 0;
+}
+
+.community-description {
+    overflow-wrap: anywhere;
+}
+
+.join-btn {
+    min-width: 6.5rem;
+}
+
+.member-badge {
+    color: var(--mb-accent);
+    background-color: var(--mb-accent-soft);
+    border: 1px solid #b9dcda;
+    font-size: 0.85rem;
+    padding: 0.45rem 0.8rem;
+}

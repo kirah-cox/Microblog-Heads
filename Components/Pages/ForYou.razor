@@ -1,0 +1,151 @@
+@page "/"
+@rendermode InteractiveServer
+@implements IDisposable
+@using microblog_heads.Models
+@inject DisplayService DisplayService
+@inject UserService UserService
+@inject CurrentUserState CurrentUser
+@inject PostService PostService
+@inject CommentService CommentService
+@inject NavigationManager Navigation
+
+@* Home page. Logged-in users see their For You feed; everyone else is sent to /login. *@
+
+<PageTitle>For You</PageTitle>
+
+<div class="feed mx-auto">
+    <h1 class="h3 mb-3">For You</h1>
+
+    @* Logged-out users are redirected to /login, so they only see the spinner briefly. *@
+    @if (!CurrentUser.IsInitialized || !CurrentUser.IsLoggedIn || isLoading)
+    {
+        <div class="d-flex justify-content-center mt-5">
+            <div class="spinner-border text-secondary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    else if (posts.Count == 0)
+    {
+        <div class="text-muted text-center py-5 border rounded bg-light">
+            No posts from other users yet. Check back later!
+        </div>
+    }
+    else
+    {
+        @foreach (var post in posts)
+        {
+            var authorId = post.RegularUserId;
+            <PostCard Post="post" @key="post.Id" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds"
+                      IsFollowingAuthor="followingIds.Contains(authorId)"
+                      OnFollowToggled="following => SetFollowing(authorId, following)" />
+        }
+    }
+</div>
+
+@code {
+    private List<Post> posts = new();
+    private readonly HashSet<int> followingIds = new(); // authors the signed-in user follows
+    private readonly HashSet<int> likedPostIds = new();    // posts the signed-in user liked
+    private readonly HashSet<int> likedCommentIds = new(); // comments the signed-in user liked
+    private bool isLoading;
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        CurrentUser.Changed += OnCurrentUserChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // If another component already restored the signed-in user in this circuit, load now.
+        if (CurrentUser.IsInitialized)
+        {
+            await LoadAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Who is signed in lives in browser storage, which is only readable once interactive.
+        // Finishing initialization raises Changed, which triggers the load (OnCurrentUserChanged).
+        if (firstRender && !CurrentUser.IsInitialized)
+        {
+            await CurrentUser.InitializeAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        errorMessage = null;
+
+        if (CurrentUser.User is not { } user)
+        {
+            posts = new();
+            Navigation.NavigateTo("login", replace: true);
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            // Random selection of other users' posts (excluding blocked users) — new order each call.
+            posts = await DisplayService.GetForYouPostsbyUserIDAsync(user.Id);
+            await LoadFollowingAsync(user.Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Couldn't load your feed: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    /// <summary>Loads who the signed-in user follows, so each card shows Follow or Following.</summary>
+    private async Task LoadFollowingAsync(int myId)
+    {
+        var following = await UserService.GetFollowingAsync(myId);
+        followingIds.Clear();
+        followingIds.UnionWith(following.Select(u => u.Id));
+        await LoadLikesAsync(myId);
+    }
+
+    private void SetFollowing(int authorId, bool following)
+    {
+        // Updates every card by this author, not just the one that was clicked.
+        if (following)
+        {
+            followingIds.Add(authorId);
+        }
+        else
+        {
+            followingIds.Remove(authorId);
+        }
+    }
+
+    /// <summary>Loads what the signed-in user has liked, so hearts show as liked after a reload or a new login.</summary>
+    private async Task LoadLikesAsync(int myId)
+    {
+        likedPostIds.Clear();
+        likedPostIds.UnionWith(await PostService.GetLikedPostIdsByUserIdAsync(myId));
+        likedCommentIds.Clear();
+        likedCommentIds.UnionWith(await CommentService.GetLikedCommentIdsByUserIdAsync(myId));
+    }
+
+    private void OnCurrentUserChanged() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        CurrentUser.Changed -= OnCurrentUserChanged;
+    }
+}

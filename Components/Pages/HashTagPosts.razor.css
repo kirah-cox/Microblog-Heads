@@ -1,0 +1,27 @@
+.feed {
+    max-width: 720px;
+}
+
+.hashtag-follow {
+    min-width: 6.5rem;
+    flex-shrink: 0;
+}
+
+    /* "Following" turns into an unfollow hint on hover. */
+    .hashtag-follow.following:hover:not(:disabled) {
+        color: var(--mb-danger);
+        border-color: var(--mb-danger);
+        background-color: transparent;
+    }
+
+.when-hover {
+    display: none;
+}
+
+.hashtag-follow:hover:not(:disabled) .when-idle {
+    display: none;
+}
+
+.hashtag-follow:hover:not(:disabled) .when-hover {
+    display: inline;
+}

@@ -78,10 +78,19 @@ public class CommentService
         };
 
         db.CommentLikes.Add(like);
-                   
+
         await db.SaveChangesAsync();
 
         return true;
+    }
+
+    public async Task<List<int>> GetLikedCommentIdsByUserIdAsync(int userId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.CommentLikes
+            .Where(l => l.RegularUserId == userId)
+            .Select(l => l.CommentId)
+            .ToListAsync();
     }
 }
 

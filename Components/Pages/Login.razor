@@ -10,19 +10,14 @@
     <div class="col-12 col-sm-10 col-md-7 col-lg-5">
         <div class="card shadow-sm">
             <div class="card-body p-4">
-                <h1 class="h3 mb-4 text-center">Log in</h1>
+                <div class="auth-header">
+                    <span class="auth-mark" aria-hidden="true">mh</span>
+                    <h1 class="h3 mb-1">Welcome back</h1>
+                    <p class="text-muted mb-0">Log in to see what everyone's posting.</p>
+                </div>
 
-                @if (CurrentUser.IsLoggedIn)
-                {
-                    <div class="alert alert-info">
-                        You are signed in as <strong>@CurrentUser.User!.Username</strong>.
-                    </div>
-                    <div class="d-flex gap-2">
-                        <a class="btn btn-primary flex-fill" href="">Go home</a>
-                        <button class="btn btn-outline-secondary flex-fill" @onclick="LogoutAsync">Log out</button>
-                    </div>
-                }
-                else
+                @* Logged-in users are redirected to the home page (see OnAfterRenderAsync). *@
+                @if (!CurrentUser.IsLoggedIn)
                 {
                     @if (!string.IsNullOrEmpty(errorMessage))
                     {
@@ -67,10 +62,13 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !CurrentUser.IsInitialized)
+        if (firstRender)
         {
-            await CurrentUser.InitializeAsync();
-            StateHasChanged();
+            await CurrentUser.InitializeAsync(); // no-op if already restored
+            if (CurrentUser.IsLoggedIn)
+            {
+                Navigation.NavigateTo("", replace: true); // already logged in: go to For You
+            }
         }
     }
 
@@ -91,11 +89,6 @@
         {
             isSubmitting = false;
         }
-    }
-
-    private async Task LogoutAsync()
-    {
-        await CurrentUser.LogoutAsync();
     }
 
     private sealed class LoginModel

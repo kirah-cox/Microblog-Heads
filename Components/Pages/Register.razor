@@ -11,7 +11,11 @@
     <div class="col-12 col-sm-10 col-md-8 col-lg-6">
         <div class="card shadow-sm">
             <div class="card-body p-4">
-                <h1 class="h3 mb-4 text-center">Create an account</h1>
+                <div class="auth-header">
+                    <span class="auth-mark" aria-hidden="true">mh</span>
+                    <h1 class="h3 mb-1">Create your account</h1>
+                    <p class="text-muted mb-0">Join Microblog Heads and start posting.</p>
+                </div>
 
                 @if (!string.IsNullOrEmpty(errorMessage))
                 {
@@ -79,6 +83,18 @@
     private string? errorMessage;
     private bool isSubmitting;
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CurrentUser.InitializeAsync(); // no-op if already restored
+            if (CurrentUser.IsLoggedIn)
+            {
+                Navigation.NavigateTo("", replace: true); // already logged in: go to For You
+            }
+        }
+    }
+
     private async Task HandleRegisterAsync()
     {
         errorMessage = null;
@@ -87,12 +103,8 @@
         {
             var username = model.Username.Trim();
 
-            if (await UserService.GetUserByUsernameAsync(username) != null)
-            {
-                errorMessage = "That username is already taken.";
-                return;
-            }
-
+            // Throws "That username is already taken." / "An account with that email
+            // already exists." for duplicates; shown below via errorMessage.
             await UserService.CreateUserAccountAsync(
                 firstName: model.FirstName.Trim(),
                 lastName: model.LastName.Trim(),

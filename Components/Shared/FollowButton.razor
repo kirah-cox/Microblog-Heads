@@ -1,0 +1,74 @@
+@* Follow/unfollow toggle for another user. The parent owns the "is following" state
+   (so every button for the same user stays in sync) and is told about changes via
+   OnToggled. Hidden when logged out or when UserId is the signed-in user. *@
+@inject UserService UserService
+@inject CurrentUserState CurrentUser
+
+@if (CurrentUser.User is { } me && me.Id != UserId)
+{
+    <button type="button"
+            class="btn @(IsFollowing ? "btn-outline-secondary" : "btn-primary") @(Small ? "btn-sm follow-sm" : "") rounded-pill"
+            disabled="@isBusy"
+            title="@error"
+            @onclick="ToggleAsync">
+        @if (isBusy)
+        {
+            <span>...</span>
+        }
+        else if (IsFollowing)
+        {
+            <span class="when-idle">Following</span><span class="when-hover">Unfollow</span>
+        }
+        else
+        {
+            <span>Follow</span>
+        }
+    </button>
+}
+
+@code {
+    /// <summary>The user to follow or unfollow.</summary>
+    [Parameter, EditorRequired] public int UserId { get; set; }
+
+    /// <summary>Whether the signed-in user currently follows <see cref="UserId"/>.</summary>
+    [Parameter] public bool IsFollowing { get; set; }
+
+    /// <summary>Raised after a successful follow (true) or unfollow (false).</summary>
+    [Parameter] public EventCallback<bool> OnToggled { get; set; }
+
+    [Parameter] public bool Small { get; set; }
+
+    private bool isBusy;
+    private string? error;
+
+    private async Task ToggleAsync()
+    {
+        if (CurrentUser.User is not { } me)
+        {
+            return;
+        }
+
+        isBusy = true;
+        error = null;
+        try
+        {
+            if (IsFollowing)
+            {
+                await UserService.UnfollowUserAsync(me.Id, UserId);
+            }
+            else
+            {
+                await UserService.FollowUserAsync(me.Id, UserId);
+            }
+            await OnToggled.InvokeAsync(!IsFollowing);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

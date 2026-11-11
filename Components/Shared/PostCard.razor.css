@@ -1,0 +1,213 @@
+.post {
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+    .post:hover {
+        box-shadow: 0 4px 14px rgba(16, 24, 40, 0.06);
+    }
+
+.author-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+    .author-link:hover strong {
+        text-decoration: underline;
+    }
+
+.post-content {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.comments {
+    border-top: 1px solid var(--mb-border);
+    padding-top: 0.75rem;
+}
+
+.comment {
+    padding: 0.4rem 0;
+    overflow-wrap: anywhere;
+}
+
+    .comment.reply {
+        border-left: 2px solid var(--mb-border);
+        padding-left: 0.75rem;
+    }
+
+.follow-post {
+    padding: 0.1rem 0.65rem;
+    font-size: 0.8rem;
+    color: var(--mb-accent);
+    border: 1px solid var(--mb-accent);
+    background-color: transparent;
+}
+
+    .follow-post:hover:not(:disabled) {
+        color: #fff;
+        background-color: var(--mb-accent);
+    }
+
+    .follow-post.followed {
+        color: #fff;
+        background-color: var(--mb-accent);
+    }
+
+        .follow-post.followed:hover:not(:disabled) {
+            color: var(--mb-danger);
+            border-color: var(--mb-danger);
+            background-color: transparent;
+        }
+
+.hashtag-link {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 50rem;
+    background-color: var(--mb-accent-soft);
+    color: var(--mb-accent-hover);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+    .hashtag-link:hover {
+        background-color: var(--mb-accent);
+        color: #fff;
+    }
+
+.community-name {
+    font-weight: 600;
+    color: inherit;
+    text-decoration: none;
+}
+
+    .community-name:hover {
+        color: var(--mb-accent);
+        text-decoration: underline;
+    }
+
+/* The original post inside a repost. */
+.reposted {
+    border: 1px solid var(--mb-border);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    background-color: var(--mb-canvas);
+}
+
+.avatar-xs {
+    width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+}
+
+/* Repost placeholder: looks like the other actions, not functional yet. */
+.repost-btn {
+    color: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+    .repost-btn:hover {
+        color: var(--mb-accent);
+    }
+
+.comment-likes {
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+}
+
+.replies-toggle {
+    font-size: inherit;
+    line-height: inherit;
+}
+
+
+/* "in <Community>" at the top right of the card: muted text, clickable name. */
+.community-tag {
+    max-width: 14rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.community-link {
+    color: inherit;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+    .community-link:hover {
+        text-decoration: underline;
+    }
+
+/* Like buttons on posts and comments: look like the other muted actions; red once liked. */
+.like-btn {
+    color: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+    .like-btn:hover:not(:disabled),
+    .like-btn.liked {
+        color: var(--mb-danger);
+    }
+
+/* ---------- Action row (likes, comments, repost, follow post) ---------- */
+.post-actions {
+    gap: 1.25rem;
+    margin-top: 0.25rem;
+}
+
+.action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    color: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.comments-btn {
+    color: inherit;
+}
+
+    .comments-btn:hover,
+    .comments-btn.open {
+        color: var(--mb-accent);
+    }
+
+.icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+    .icon.filled {
+        fill: currentColor;
+    }
+
+.comment-likes .icon {
+    width: 14px;
+    height: 14px;
+}
+
+.follow-post {
+    white-space: nowrap;
+}
+
+/* Narrow phones: keep the row on one line by showing just icon + number. */
+@media (max-width: 480px) {
+    .post-actions {
+        gap: 1rem;
+    }
+
+    .action-label {
+        display: none;
+    }
+}

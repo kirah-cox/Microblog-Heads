@@ -147,5 +147,17 @@ public class CommunityService
             throw new InvalidOperationException("Could not update users role. ", ex);
         }
 
-    }       
+    }
+
+    public async Task<List<CommunityUserRole>> GetCommunityRolesByUserIdAsync(int userId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.CommunityUserRoles
+            .Where(r => r.RegularUserId == userId)
+            .Include(r => r.Community)
+            .Include(r => r.CommunityRole)
+            .OrderBy(r => r.Community.Name)
+            .ToListAsync();
+    }
+
 }

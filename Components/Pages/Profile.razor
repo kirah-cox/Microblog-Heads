@@ -5,7 +5,12 @@
 @using microblog_heads.Models
 @inject UserService UserService
 @inject DisplayService DisplayService
+@inject HashTagService HashTagService
+@inject CommunityService CommunityService
 @inject CurrentUserState CurrentUser
+@inject PostService PostService
+@inject CommentService CommentService
+@inject NavigationManager Navigation
 
 <PageTitle>@(profileUser is null ? "Profile" : $"{profileUser.FirstName} {profileUser.LastName} (@{profileUser.Username})")</PageTitle>
 
@@ -45,16 +50,76 @@ else
                         <div class="small text-muted mb-3">@profileUser.Email</div>
                     }
 
-                    <div class="d-flex justify-content-center justify-content-sm-start gap-4">
+                    <div class="d-flex flex-wrap justify-content-center justify-content-sm-start column-gap-4 row-gap-1">
                         <div><strong>@posts.Count</strong> <span class="text-muted">@(posts.Count == 1 ? "post" : "posts")</span></div>
-                        <div><strong>@followerCount</strong> <span class="text-muted">@(followerCount == 1 ? "follower" : "followers")</span></div>
+                        <button type="button" class="btn btn-link stat-link p-0" @onclick="() => OpenModalAsync(ProfileModal.Followers)" aria-haspopup="dialog">
+                            <strong>@followers.Count</strong> <span>@(followers.Count == 1 ? "follower" : "followers")</span>
+                        </button>
                         <div><strong>@totalLikes</strong> <span class="text-muted">@(totalLikes == 1 ? "like" : "likes")</span></div>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-center justify-content-sm-start gap-2 mt-3">
+                        @if (IsOwnProfile)
+                        {
+                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill text-nowrap" @onclick="() => OpenModalAsync(ProfileModal.Following)" aria-haspopup="dialog">
+                                People you follow (@myFollowingIds.Count)
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill text-nowrap" @onclick="() => OpenModalAsync(ProfileModal.HashTags)" aria-haspopup="dialog">
+                                # Hashtags you follow (@myHashTagIds.Count)
+                            </button>
+                        }
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill text-nowrap" @onclick="() => OpenModalAsync(ProfileModal.Communities)" aria-haspopup="dialog">
+                            @(IsOwnProfile ? "Your communities" : "Communities") (@communityRoles.Count)
+                        </button>
+                        @if (IsOwnProfile)
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill text-nowrap" @onclick="() => OpenModalAsync(ProfileModal.Blocked)" aria-haspopup="dialog">
+                                Blocked users (@myBlockedIds.Count)
+                            </button>
+                        }
                     </div>
                 </div>
 
                 @if (IsOwnProfile)
                 {
                     <span class="badge rounded-pill text-bg-light border align-self-center align-self-sm-start">This is you</span>
+                }
+                else
+                {
+                    <div class="align-self-center align-self-sm-start d-flex flex-column align-items-center align-items-sm-end gap-2">
+                        <FollowButton UserId="profileUser.Id" IsFollowing="IsFollowingProfileUser" OnToggled="SetFollowingProfileUser" />
+
+                        @if (IsBlockingProfileUser)
+                        {
+                            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill block-btn" disabled="@(togglingBlockId == profileUser.Id)"
+                                    @onclick="() => ToggleBlockAsync(profileUser.Id)">
+                                @(togglingBlockId == profileUser.Id ? "..." : "Unblock")
+                            </button>
+                            <div class="small text-danger">You've blocked @@@profileUser.Username</div>
+                        }
+                        else if (confirmingBlock)
+                        {
+                            @* Blocking is a big step, so ask once before doing it. *@
+                            <div class="small text-muted">Block @@@profileUser.Username?</div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-danger btn-sm rounded-pill" disabled="@(togglingBlockId == profileUser.Id)"
+                                        @onclick="() => ToggleBlockAsync(profileUser.Id)">
+                                    @(togglingBlockId == profileUser.Id ? "..." : "Block")
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" @onclick="() => confirmingBlock = false">Cancel</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill block-btn" @onclick="() => confirmingBlock = true">
+                                Block
+                            </button>
+                        }
+                        @if (!string.IsNullOrEmpty(blockError))
+                        {
+                            <div class="small text-danger">@blockError</div>
+                        }
+                    </div>
                 }
             </div>
         </section>
@@ -75,66 +140,148 @@ else
         {
             @foreach (var post in posts)
             {
-                <article class="card post mb-3" @key="post.Id">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <div class="avatar avatar-sm" aria-hidden="true">@Initials(profileUser)</div>
-                            <div class="lh-sm">
-                                <strong>@profileUser.FirstName @profileUser.LastName</strong>
-                                <span class="text-muted">@@@profileUser.Username</span>
-                                <div class="small text-muted">@FormatDate(post.DatePosted)</div>
-                            </div>
-                            @if (post.ParentPostId is not null)
+                <PostCard Post="post" @key="post.Id" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds" IsFollowingAuthor="IsFollowingProfileUser" OnFollowToggled="SetFollowingProfileUser" />
+            }
+        }
+    </div>
+
+    @if (openModal != ProfileModal.None)
+    {
+        @* Bootstrap's modal styling, opened/closed by Blazor (Bootstrap's JS isn't loaded). *@
+        <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title"
+             @ref="modalElement" @onclick="CloseModal" @onkeydown="OnModalKeyDown">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" @onclick:stopPropagation="true">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="profile-modal-title">
+                            @ModalTitle
+                            @if (!isModalLoading)
                             {
-                                <span class="badge text-bg-secondary ms-auto">Repost</span>
+                                <span class="text-muted fw-normal"> (@ModalCount)</span>
                             }
-                        </div>
-
-                        <p class="post-content mb-2">@post.Content</p>
-
-                        @if (post.PostHashTags.Count > 0)
+                        </h2>
+                        <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        @if (isModalLoading)
                         {
-                            <div class="mb-2">
-                                @foreach (var tag in post.PostHashTags)
-                                {
-                                    <span class="badge rounded-pill text-bg-primary bg-opacity-75 me-1">#@tag.HashTag.Name</span>
-                                }
+                            <div class="d-flex justify-content-center py-5">
+                                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </div>
                         }
-
-                        <div class="d-flex gap-3 small text-muted">
-                            <span>♥ @post.PostLikes.Count @(post.PostLikes.Count == 1 ? "like" : "likes")</span>
-                            @if (post.Comments.Count > 0)
+                        else if (!string.IsNullOrEmpty(modalError))
+                        {
+                            <div class="alert alert-danger m-3">@modalError</div>
+                        }
+                        else if (openModal == ProfileModal.Followers)
+                        {
+                            @UserList(followers, IsOwnProfile ? "You don't have any followers yet." : $"@{profileUser.Username} doesn't have any followers yet.")
+                        }
+                        else if (openModal == ProfileModal.Following)
+                        {
+                            @UserList(myFollowing, "You aren't following anyone yet.")
+                        }
+                        else if (openModal == ProfileModal.Blocked)
+                        {
+                            @if (myBlocked.Count == 0)
                             {
-                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" @onclick="() => ToggleComments(post.Id)">
-                                    💬 @post.Comments.Count @(post.Comments.Count == 1 ? "comment" : "comments")
-                                    @(expandedPosts.Contains(post.Id) ? "▴" : "▾")
-                                </button>
+                                <div class="text-muted text-center py-5">You haven't blocked anyone.</div>
                             }
                             else
                             {
-                                <span>💬 0 comments</span>
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var user in myBlocked)
+                                    {
+                                        var blocked = myBlockedIds.Contains(user.Id);
+                                        <li class="list-group-item d-flex align-items-center gap-3 px-3" @key="user.Id">
+                                            <a href="profile/@user.Username" tabindex="-1" aria-hidden="true" class="text-decoration-none">
+                                                <div class="avatar avatar-sm">@Initials(user)</div>
+                                            </a>
+                                            <a href="profile/@user.Username" class="follower-link lh-sm flex-fill">
+                                                <strong>@user.FirstName @user.LastName</strong>
+                                                <div class="text-muted small">@@@user.Username</div>
+                                            </a>
+                                            @* The row stays after unblocking, so a mistake can be undone right here. *@
+                                            <button type="button"
+                                                    class="btn btn-sm rounded-pill block-toggle @(blocked ? "btn-outline-danger" : "btn-outline-secondary")"
+                                                    disabled="@(togglingBlockId == user.Id)"
+                                                    @onclick="() => ToggleBlockAsync(user.Id)">
+                                                @(togglingBlockId == user.Id ? "..." : blocked ? "Unblock" : "Block")
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
                             }
-                        </div>
-
-                        @if (expandedPosts.Contains(post.Id))
+                        }
+                        else if (openModal == ProfileModal.Communities)
                         {
-                            <ul class="list-unstyled comments mt-3 mb-0">
-                                @foreach (var comment in OrderedComments(post))
+                            @if (communityRoles.Count == 0)
+                            {
+                                <div class="text-muted text-center py-5">
+                                    @(IsOwnProfile ? "You aren't part of any communities yet." : $"@{profileUser.Username} isn't part of any communities yet.")
+                                </div>
+                            }
+                            else
+                            {
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var membership in communityRoles)
+                                    {
+                                        <li class="list-group-item d-flex align-items-center gap-3 px-3" @key="membership.Id">
+                                            <div class="avatar avatar-sm" aria-hidden="true">@membership.Community.Name.FirstOrDefault()</div>
+                                            <a href="community/@membership.CommunityId" class="follower-link lh-sm flex-fill min-w-0">
+                                                <strong>@membership.Community.Name</strong>
+                                                <div class="text-muted small community-description">@membership.Community.Description</div>
+                                            </a>
+                                            <span class="badge rounded-pill @RoleBadgeClass(membership.CommunityRole.Role)">@membership.CommunityRole.Role</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        }
+                        else if (myHashTags.Count == 0)
+                        {
+                            <div class="text-muted text-center py-5">You aren't following any hashtags yet.</div>
+                        }
+                        else
+                        {
+                            <ul class="list-group list-group-flush">
+                                @foreach (var tag in myHashTags)
                                 {
-                                    <li class="comment @(comment.Depth > 0 ? "reply" : "")" style="margin-left: @(Math.Min(comment.Depth, 4) * 1.25)rem">
-                                        <a href="profile/@comment.Comment.RegularUser.Username" class="fw-semibold text-decoration-none">@@@comment.Comment.RegularUser.Username</a>
-                                        <span class="small text-muted ms-1">@FormatDate(comment.Comment.DatePosted)</span>
-                                        <div>@comment.Comment.Content</div>
+                                    var followed = myHashTagIds.Contains(tag.Id);
+                                    <li class="list-group-item d-flex align-items-center gap-3 px-3" @key="tag.Id">
+                                        <div class="avatar avatar-sm" aria-hidden="true">#</div>
+                                        <a href="hashtag/@tag.Id" class="follower-link flex-fill">
+                                            <strong>#@tag.Name</strong>
+                                        </a>
+                                        <button type="button"
+                                                class="btn btn-sm rounded-pill tag-toggle @(followed ? "btn-outline-secondary following" : "btn-primary")"
+                                                disabled="@(togglingHashTagId == tag.Id)"
+                                                @onclick="() => ToggleHashTagAsync(tag.Id)">
+                                            @if (togglingHashTagId == tag.Id)
+                                            {
+                                                <span>...</span>
+                                            }
+                                            else if (followed)
+                                            {
+                                                <span class="when-idle">Following</span><span class="when-hover">Unfollow</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Follow</span>
+                                            }
+                                        </button>
                                     </li>
                                 }
                             </ul>
                         }
                     </div>
-                </article>
-            }
-        }
-    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop show"></div>
+    }
 }
 
 @code {
@@ -143,14 +290,41 @@ else
 
     private RegularUser? profileUser;
     private List<Post> posts = new();
-    private int followerCount;
+    private List<RegularUser> followers = new();        // users who follow profileUser
+    private readonly HashSet<int> myFollowingIds = new(); // users the signed-in user follows
+    private readonly HashSet<int> likedPostIds = new();    // posts the signed-in user liked
+    private readonly HashSet<int> likedCommentIds = new(); // comments the signed-in user liked
     private int totalLikes;
     private bool isLoading = true;
+
+    // Pop-up lists. Followers is on every profile; Following and HashTags only on your own.
+    // Followers and Communities are on every profile; Following and HashTags only on your own.
+    private enum ProfileModal { None, Followers, Following, HashTags, Communities, Blocked }
+
+    // Blocking. myBlockedIds = users the signed-in user has blocked.
+    private readonly HashSet<int> myBlockedIds = new();
+    private List<RegularUser> myBlocked = new(); // shown in the Blocked users modal (own profile)
+    private bool confirmingBlock;                // "Block @user?" confirmation showing on another user's profile
+    private int? togglingBlockId;
+    private string? blockError;
+
+    private bool IsBlockingProfileUser => profileUser is not null && myBlockedIds.Contains(profileUser.Id);
+    private List<CommunityUserRole> communityRoles = new(); // profileUser's communities + role in each
+    private ProfileModal openModal = ProfileModal.None;
+    private bool focusModal; // move focus into the modal after it renders (so Escape works)
+    private ElementReference modalElement;
+    private bool isModalLoading;
+    private string? modalError;
+    private List<RegularUser> myFollowing = new();         // shown in the Following modal
+    private List<HashTag> myHashTags = new();              // shown in the HashTags modal
+    private readonly HashSet<int> myHashTagIds = new();    // hashtags the signed-in user follows
+    private int? togglingHashTagId;
     private bool needsLogin;
     private string? errorMessage;
-    private readonly HashSet<int> expandedPosts = new();
 
     private bool IsOwnProfile => profileUser is not null && CurrentUser.User?.Id == profileUser.Id;
+
+    private bool IsFollowingProfileUser => profileUser is not null && myFollowingIds.Contains(profileUser.Id);
 
     protected override void OnInitialized()
     {
@@ -174,14 +348,223 @@ else
         {
             await CurrentUser.InitializeAsync();
         }
+
+        if (focusModal && openModal != ProfileModal.None)
+        {
+            focusModal = false;
+            await modalElement.FocusAsync();
+        }
     }
+
+    private string ModalTitle => openModal switch
+    {
+        ProfileModal.Followers => IsOwnProfile ? "Your followers" : $"People following @{profileUser?.Username}",
+        ProfileModal.Following => "People you follow",
+        ProfileModal.HashTags => "Hashtags you follow",
+        ProfileModal.Communities => IsOwnProfile ? "Your communities" : $"Communities @{profileUser?.Username} is in",
+        ProfileModal.Blocked => "Blocked users",
+        _ => ""
+    };
+
+    private int ModalCount => openModal switch
+    {
+        ProfileModal.Followers => followers.Count,
+        ProfileModal.Following => myFollowingIds.Count,
+        ProfileModal.HashTags => myHashTagIds.Count,
+        ProfileModal.Communities => communityRoles.Count,
+        ProfileModal.Blocked => myBlockedIds.Count,
+        _ => 0
+    };
+
+    private static string RoleBadgeClass(string role) => role switch
+    {
+        "Admin" => "text-bg-primary",
+        "Moderator" => "text-bg-info",
+        _ => "text-bg-light border"
+    };
+
+    private async Task OpenModalAsync(ProfileModal modal)
+    {
+        openModal = modal;
+        focusModal = true;
+        modalError = null;
+
+        if (modal is ProfileModal.Followers or ProfileModal.Communities || CurrentUser.User is not { } me)
+        {
+            return; // followers and communities are already loaded with the profile
+        }
+
+        // Fetch fresh each time, so follows made elsewhere (e.g. following back a follower) show up.
+        isModalLoading = true;
+        try
+        {
+            if (modal == ProfileModal.Following)
+            {
+                myFollowing = (await UserService.GetFollowingAsync(me.Id))
+                    .OrderBy(u => u.Username, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                myFollowingIds.Clear();
+                myFollowingIds.UnionWith(myFollowing.Select(u => u.Id));
+            }
+            else if (modal == ProfileModal.Blocked)
+            {
+                myBlocked = (await UserService.GetBlockedUsersAsync(me.Id))
+                    .OrderBy(u => u.Username, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                myBlockedIds.Clear();
+                myBlockedIds.UnionWith(myBlocked.Select(u => u.Id));
+            }
+            else
+            {
+                myHashTags = (await HashTagService.GetFollowedHashTagsByUserIdAsync(me.Id))
+                    .OrderBy(h => h.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                myHashTagIds.Clear();
+                myHashTagIds.UnionWith(myHashTags.Select(h => h.Id));
+            }
+        }
+        catch (Exception ex)
+        {
+            modalError = $"Couldn't load this list: {ex.Message}";
+        }
+        finally
+        {
+            isModalLoading = false;
+        }
+    }
+
+    private void CloseModal() => openModal = ProfileModal.None;
+
+    private void OnModalKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            CloseModal();
+        }
+    }
+
+    /// <summary>Blocks the user if not blocked yet, otherwise unblocks them (profile header or Blocked modal).</summary>
+    private async Task ToggleBlockAsync(int userId)
+    {
+        if (CurrentUser.User is not { } me)
+        {
+            return;
+        }
+
+        togglingBlockId = userId;
+        blockError = null;
+        modalError = null;
+        try
+        {
+            if (myBlockedIds.Contains(userId))
+            {
+                await UserService.UnblockUserAsync(me.Id, userId);
+                myBlockedIds.Remove(userId);
+            }
+            else
+            {
+                await UserService.BlockUserAsync(me.Id, userId);
+                myBlockedIds.Add(userId);
+            }
+            confirmingBlock = false;
+        }
+        catch (Exception ex)
+        {
+            if (openModal == ProfileModal.Blocked)
+            {
+                modalError = ex.Message;
+            }
+            else
+            {
+                blockError = ex.Message;
+            }
+        }
+        finally
+        {
+            togglingBlockId = null;
+        }
+    }
+
+    /// <summary>Follow/unfollow a hashtag from the Hashtags modal. The row stays so it can be re-followed.</summary>
+    private async Task ToggleHashTagAsync(int hashTagId)
+    {
+        if (CurrentUser.User is not { } me)
+        {
+            return;
+        }
+
+        togglingHashTagId = hashTagId;
+        modalError = null;
+        try
+        {
+            if (myHashTagIds.Contains(hashTagId))
+            {
+                await HashTagService.UnfollowHashTagAsync(me.Id, hashTagId);
+                myHashTagIds.Remove(hashTagId);
+            }
+            else
+            {
+                await HashTagService.FollowHashTagAsync(me.Id, hashTagId);
+                myHashTagIds.Add(hashTagId);
+            }
+        }
+        catch (Exception ex)
+        {
+            modalError = ex.Message;
+        }
+        finally
+        {
+            togglingHashTagId = null;
+        }
+    }
+
+    /// <summary>A list of users (avatar, name, @username, Follow button) for the Followers/Following modals.</summary>
+    private RenderFragment UserList(List<RegularUser> users, string emptyMessage) => __builder =>
+    {
+        if (users.Count == 0)
+        {
+            <div class="text-muted text-center py-5">@emptyMessage</div>
+            return;
+        }
+
+        <ul class="list-group list-group-flush">
+            @foreach (var user in users)
+            {
+                <li class="list-group-item d-flex align-items-center gap-3 px-3" @key="user.Id">
+                    <a href="profile/@user.Username" tabindex="-1" aria-hidden="true" class="text-decoration-none">
+                        <div class="avatar avatar-sm">@Initials(user)</div>
+                    </a>
+                    <a href="profile/@user.Username" class="follower-link lh-sm flex-fill">
+                        <strong>@user.FirstName @user.LastName</strong>
+                        <div class="text-muted small">@@@user.Username</div>
+                    </a>
+                    @if (CurrentUser.User?.Id == user.Id)
+                    {
+                        <span class="badge rounded-pill text-bg-light border">You</span>
+                    }
+                    else
+                    {
+                        <FollowButton UserId="user.Id" IsFollowing="myFollowingIds.Contains(user.Id)"
+                                      OnToggled="f => SetFollowing(user.Id, f)" Small="true" />
+                    }
+                </li>
+            }
+        </ul>
+    };
 
     private async Task LoadAsync()
     {
         isLoading = true;
+        openModal = ProfileModal.None; // e.g. after clicking someone in a modal and landing on their profile
         needsLogin = false;
         errorMessage = null;
-        expandedPosts.Clear();
+
+        // Only logged-in users can see profiles; everyone else goes to the login page.
+        if (CurrentUser.User is null)
+        {
+            Navigation.NavigateTo("login", replace: true);
+            return;
+        }
 
         try
         {
@@ -195,15 +578,38 @@ else
                 profileUser = await UserService.GetUserByUsernameAsync(Username);
             }
 
+            myFollowingIds.Clear();
+            myHashTagIds.Clear();
+            myBlockedIds.Clear();
+            confirmingBlock = false;
+            blockError = null;
+            if (CurrentUser.User is { } me)
+            {
+                myFollowingIds.UnionWith((await UserService.GetFollowingAsync(me.Id)).Select(u => u.Id));
+                await LoadLikesAsync(me.Id);
+                myBlockedIds.UnionWith((await UserService.GetBlockedUsersAsync(me.Id)).Select(u => u.Id));
+
+                if (string.IsNullOrWhiteSpace(Username) || me.Username.Equals(Username, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Own profile: needed for the "Hashtags you follow" count.
+                    myHashTagIds.UnionWith((await HashTagService.GetFollowedHashTagsByUserIdAsync(me.Id)).Select(h => h.Id));
+                }
+            }
+
             if (profileUser is null)
             {
                 posts = new();
+                followers = new();
+                communityRoles = new();
                 return;
             }
 
             posts = await DisplayService.GetPostsbyUserIDAsync(profileUser.Id);
-            followerCount = (await UserService.GetFollowersAsync(profileUser.Id)).Count;
-            totalLikes = posts.Sum(p => p.PostLikes.Count);
+            followers = (await UserService.GetFollowersAsync(profileUser.Id))
+                .OrderBy(u => u.Username, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            communityRoles = await CommunityService.GetCommunityRolesByUserIdAsync(profileUser.Id);
+            totalLikes = posts.Sum(p => p.LikeCount);
         }
         catch (Exception ex)
         {
@@ -215,6 +621,15 @@ else
         }
     }
 
+    /// <summary>Loads what the signed-in user has liked, so hearts show as liked after a reload or a new login.</summary>
+    private async Task LoadLikesAsync(int myId)
+    {
+        likedPostIds.Clear();
+        likedPostIds.UnionWith(await PostService.GetLikedPostIdsByUserIdAsync(myId));
+        likedCommentIds.Clear();
+        likedCommentIds.UnionWith(await CommentService.GetLikedCommentIdsByUserIdAsync(myId));
+    }
+
     private void OnCurrentUserChanged() => InvokeAsync(async () =>
     {
         // Logging in/out changes what /profile shows and whether this is "your" profile.
@@ -222,47 +637,37 @@ else
         StateHasChanged();
     });
 
-    private void ToggleComments(int postId)
+    /// <summary>Records a follow/unfollow by the signed-in user so every button for that user updates.</summary>
+    private void SetFollowing(int userId, bool following)
     {
-        if (!expandedPosts.Remove(postId))
+        if (following)
         {
-            expandedPosts.Add(postId);
+            myFollowingIds.Add(userId);
+        }
+        else
+        {
+            myFollowingIds.Remove(userId);
         }
     }
 
-    private record CommentRow(Comment Comment, int Depth);
-
-    /// <summary>Flattens a post's comments into thread order: each comment followed by its replies.</summary>
-    private static IEnumerable<CommentRow> OrderedComments(Post post)
+    /// <summary>Following/unfollowing the profile owner also adds/removes you in their Followers list.</summary>
+    private void SetFollowingProfileUser(bool following)
     {
-        var ids = post.Comments.Select(c => c.Id).ToHashSet();
-        var children = post.Comments
-            .Where(c => c.ParentCommentId is int p && ids.Contains(p))
-            .ToLookup(c => c.ParentCommentId!.Value);
-
-        IEnumerable<CommentRow> Walk(Comment c, int depth)
+        if (profileUser is null || CurrentUser.User is not { } me)
         {
-            yield return new CommentRow(c, depth);
-            foreach (var child in children[c.Id].OrderBy(x => x.DatePosted))
-            {
-                foreach (var row in Walk(child, depth + 1))
-                {
-                    yield return row;
-                }
-            }
+            return;
         }
 
-        // Top-level comments, plus any whose parent isn't in the list (treated as top-level).
-        return post.Comments
-            .Where(c => c.ParentCommentId is not int p || !ids.Contains(p))
-            .OrderBy(c => c.DatePosted)
-            .SelectMany(c => Walk(c, 0));
+        SetFollowing(profileUser.Id, following);
+        followers.RemoveAll(f => f.Id == me.Id);
+        if (following)
+        {
+            followers.Add(me);
+            followers.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Username, b.Username));
+        }
     }
 
-    private static string Initials(RegularUser user) =>
-        $"{user.FirstName.FirstOrDefault()}{user.LastName.FirstOrDefault()}".ToUpperInvariant();
-
-    private static string FormatDate(DateTime date) => date.ToString("MMM d, yyyy · h:mm tt");
+    private static string Initials(RegularUser user) => PostCard.Initials(user);
 
     public void Dispose()
     {

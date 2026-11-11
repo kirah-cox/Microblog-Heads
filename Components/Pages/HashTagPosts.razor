@@ -1,0 +1,225 @@
+@page "/hashtag/{HashTagId:int}"
+@rendermode InteractiveServer
+@implements IDisposable
+@using microblog_heads.Models
+@inject HashTagService HashTagService
+@inject DisplayService DisplayService
+@inject UserService UserService
+@inject CurrentUserState CurrentUser
+@inject PostService PostService
+@inject CommentService CommentService
+@inject NavigationManager Navigation
+
+@* All posts tagged with one hashtag, newest first. Reached by clicking a hashtag on a post. *@
+
+<PageTitle>@(hashTag is null ? "Hashtag" : $"#{hashTag.Name}")</PageTitle>
+
+<div class="feed mx-auto">
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center mt-5">
+            <div class="spinner-border text-secondary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-4">@errorMessage</div>
+    }
+    else if (hashTag is null)
+    {
+        <div class="alert alert-warning mt-4">That hashtag doesn't exist.</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+            <div>
+                <h1 class="h3 mb-1">#@hashTag.Name</h1>
+                <p class="text-muted small mb-0">@posts.Count @(posts.Count == 1 ? "post" : "posts"), newest first</p>
+            </div>
+
+            @if (CurrentUser.IsLoggedIn)
+            {
+                @* Followed hashtags' posts show up on the Following page. *@
+                <button type="button"
+                        class="btn @(isFollowingHashTag ? "btn-outline-secondary following" : "btn-primary") rounded-pill hashtag-follow"
+                        disabled="@isTogglingFollow"
+                        title="@(followError ?? (isFollowingHashTag ? $"Stop following #{hashTag.Name}" : $"Follow #{hashTag.Name} to see its posts on your Following page"))"
+                        aria-pressed="@(isFollowingHashTag ? "true" : "false")"
+                        @onclick="ToggleFollowHashTagAsync">
+                    @if (isTogglingFollow)
+                    {
+                        <span>...</span>
+                    }
+                    else if (isFollowingHashTag)
+                    {
+                        <span class="when-idle">Following</span><span class="when-hover">Unfollow</span>
+                    }
+                    else
+                    {
+                        <span>Follow</span>
+                    }
+                </button>
+            }
+        </div>
+
+        @if (posts.Count == 0)
+        {
+            <div class="text-muted text-center py-5 border rounded bg-light">
+                No posts use #@hashTag.Name yet.
+            </div>
+        }
+        else
+        {
+            @foreach (var post in posts)
+            {
+                var authorId = post.RegularUserId;
+                <PostCard Post="post" @key="post.Id" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds"
+                          IsFollowingAuthor="followingIds.Contains(authorId)"
+                          OnFollowToggled="following => SetFollowing(authorId, following)" />
+            }
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int HashTagId { get; set; }
+
+    private HashTag? hashTag;
+    private List<Post> posts = new();
+    private readonly HashSet<int> followingIds = new(); // users the signed-in user follows
+    private readonly HashSet<int> likedPostIds = new();    // posts the signed-in user liked
+    private readonly HashSet<int> likedCommentIds = new(); // comments the signed-in user liked
+    private bool isLoading = true;
+    private string? errorMessage;
+    private bool isFollowingHashTag; // whether the signed-in user follows this hashtag
+    private bool isTogglingFollow;
+    private string? followError;
+
+    protected override void OnInitialized()
+    {
+        CurrentUser.Changed += OnCurrentUserChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Runs again when clicking a different hashtag on this page (e.g. #coding -> #docker).
+        if (CurrentUser.IsInitialized)
+        {
+            await LoadAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Who is signed in lives in browser storage, which is only readable once interactive.
+        // Finishing initialization raises Changed, which triggers the load (OnCurrentUserChanged).
+        if (firstRender && !CurrentUser.IsInitialized)
+        {
+            await CurrentUser.InitializeAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        // Only logged-in users can see hashtag pages; everyone else goes to the login page.
+        if (CurrentUser.User is null)
+        {
+            Navigation.NavigateTo("login", replace: true);
+            return;
+        }
+
+        try
+        {
+            hashTag = await HashTagService.GetHashTagByIdAsync(HashTagId);
+            posts = hashTag is null ? new() : await DisplayService.GetPostsHashTagIDAsync(HashTagId);
+
+            followingIds.Clear();
+            isFollowingHashTag = false;
+            followError = null;
+            if (CurrentUser.User is { } me)
+            {
+                followingIds.UnionWith((await UserService.GetFollowingAsync(me.Id)).Select(u => u.Id));
+                await LoadLikesAsync(me.Id);
+                isFollowingHashTag = (await HashTagService.GetFollowedHashTagsByUserIdAsync(me.Id))
+                    .Any(h => h.Id == HashTagId);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Couldn't load this hashtag: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ToggleFollowHashTagAsync()
+    {
+        if (CurrentUser.User is not { } me)
+        {
+            return;
+        }
+
+        isTogglingFollow = true;
+        followError = null;
+        try
+        {
+            if (isFollowingHashTag)
+            {
+                await HashTagService.UnfollowHashTagAsync(me.Id, HashTagId);
+            }
+            else
+            {
+                await HashTagService.FollowHashTagAsync(me.Id, HashTagId);
+            }
+            isFollowingHashTag = !isFollowingHashTag;
+        }
+        catch (Exception ex)
+        {
+            followError = ex.Message;
+        }
+        finally
+        {
+            isTogglingFollow = false;
+        }
+    }
+
+    private void SetFollowing(int authorId, bool following)
+    {
+        // Updates every card by this author, not just the one that was clicked.
+        if (following)
+        {
+            followingIds.Add(authorId);
+        }
+        else
+        {
+            followingIds.Remove(authorId);
+        }
+    }
+
+    /// <summary>Loads what the signed-in user has liked, so hearts show as liked after a reload or a new login.</summary>
+    private async Task LoadLikesAsync(int myId)
+    {
+        likedPostIds.Clear();
+        likedPostIds.UnionWith(await PostService.GetLikedPostIdsByUserIdAsync(myId));
+        likedCommentIds.Clear();
+        likedCommentIds.UnionWith(await CommentService.GetLikedCommentIdsByUserIdAsync(myId));
+    }
+
+    private void OnCurrentUserChanged() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        CurrentUser.Changed -= OnCurrentUserChanged;
+    }
+}

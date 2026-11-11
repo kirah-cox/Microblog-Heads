@@ -1,0 +1,376 @@
+@using microblog_heads.Models
+@inject PostService PostService
+@inject CommentService CommentService
+@inject CurrentUserState CurrentUser
+
+@* Displays one post: author, date, content, hashtags, like count, an expandable
+   comment thread and a Follow post toggle. Expects the post to be loaded the way
+   DisplayService loads posts (RegularUser, Community, ParentPost.RegularUser, ParentPost.Community,
+   PostFollows, PostHashTags.HashTag and Comments.RegularUser included; LikeCount set on
+   the post and its comments). *@
+
+<article class="card post mb-3">
+    <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <a href="profile/@Post.RegularUser.Username" class="text-decoration-none" tabindex="-1" aria-hidden="true">
+                <div class="avatar avatar-sm">@Initials(Post.RegularUser)</div>
+            </a>
+            <div class="lh-sm">
+                <div class="d-flex flex-wrap align-items-center column-gap-2 row-gap-1">
+                    <a href="profile/@Post.RegularUser.Username" class="author-link">
+                        <strong>@Post.RegularUser.FirstName @Post.RegularUser.LastName</strong>
+                        <span class="text-muted">@@@Post.RegularUser.Username</span>
+                    </a>
+                    <FollowButton UserId="Post.RegularUserId" IsFollowing="IsFollowingAuthor" OnToggled="OnFollowToggled" Small="true" />
+                </div>
+                <div class="small text-muted">@FormatDate(Post.DatePosted)</div>
+            </div>
+
+            @if (Post.Community is not null)
+            {
+                <div class="ms-auto flex-shrink-0 align-self-start small text-muted community-tag">
+                    in <a href="community/@Post.Community.Id" class="community-link"
+                          title="See all posts in @Post.Community.Name">@Post.Community.Name</a>
+                </div>
+            }
+        </div>
+
+        <p class="post-content mb-2">@Post.Content</p>
+
+        @if (Post.ParentPost is { } original)
+        {
+            @* The post being reposted, shown as a quoted card. *@
+            <div class="reposted mb-2" aria-label="Reposted post">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <a href="profile/@original.RegularUser.Username" class="text-decoration-none" tabindex="-1" aria-hidden="true">
+                        <div class="avatar avatar-xs">@Initials(original.RegularUser)</div>
+                    </a>
+                    <div class="lh-sm small">
+                        <a href="profile/@original.RegularUser.Username" class="author-link">
+                            <strong>@original.RegularUser.FirstName @original.RegularUser.LastName</strong>
+                            <span class="text-muted">@@@original.RegularUser.Username</span>
+                        </a>
+                        <div class="text-muted">
+                            @FormatDate(original.DatePosted)
+                            @if (original.Community is not null)
+                            {
+                                <span> · in <a href="community/@original.Community.Id" class="community-name">@original.Community.Name</a></span>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <p class="post-content mb-0">@original.Content</p>
+            </div>
+        }
+        else if (Post.ParentPostId is not null)
+        {
+            <div class="reposted text-muted small mb-2">The original post isn't available.</div>
+        }
+
+        @if (Post.PostHashTags.Count > 0)
+        {
+            <div class="mb-2">
+                @foreach (var tag in Post.PostHashTags)
+                {
+                    <a href="hashtag/@tag.HashTagId" class="hashtag-link me-1"
+                       title="See all posts with #@tag.HashTag.Name">#@tag.HashTag.Name</a>
+                }
+            </div>
+        }
+
+        <div class="post-actions d-flex align-items-center small text-muted">
+            @if (CurrentUser.User is { } me && me.Id != Post.RegularUserId)
+            {
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none action like-btn @(IsPostLiked ? "liked" : "")"
+                        disabled="@isTogglingPostLike"
+                        aria-pressed="@(IsPostLiked ? "true" : "false")"
+                        title="@(likeError ?? (IsPostLiked ? "Unlike" : "Like"))"
+                        @onclick="TogglePostLikeAsync">
+                    @HeartIcon(IsPostLiked) @Post.LikeCount <span class="action-label">@(Post.LikeCount == 1 ? "like" : "likes")</span>
+                </button>
+            }
+            else
+            {
+                @* Your own post (or logged out): count only, no liking. *@
+                <span class="action">@HeartIcon(false) @Post.LikeCount <span class="action-label">@(Post.LikeCount == 1 ? "like" : "likes")</span></span>
+            }
+            @if (Post.Comments.Count > 0)
+            {
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none action comments-btn @(showComments ? "open" : "")"
+                        aria-expanded="@(showComments ? "true" : "false")"
+                        @onclick="() => showComments = !showComments">
+                    @CommentIcon @Post.Comments.Count <span class="action-label">@(Post.Comments.Count == 1 ? "comment" : "comments")</span>
+                </button>
+            }
+            else
+            {
+                <span class="action">@CommentIcon 0 <span class="action-label">comments</span></span>
+            }
+
+            @* Placeholder: not wired up yet (no click handler). Will use PostService.CreateRepostAsync. *@
+            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none action repost-btn"
+                    title="Reposting isn't available yet">
+                @RepostIcon <span class="action-label">Repost</span>
+            </button>
+
+            @if (CurrentUser.IsLoggedIn)
+            {
+                @* Followed posts show up on the Following page. *@
+                <button type="button"
+                        class="btn btn-sm rounded-pill ms-auto follow-post @(IsPostFollowed ? "followed" : "")"
+                        disabled="@isTogglingPostFollow"
+                        title="@(postFollowError ?? (IsPostFollowed ? "Stop following this post" : "Follow this post to see it on your Following page"))"
+                        aria-pressed="@(IsPostFollowed ? "true" : "false")"
+                        @onclick="ToggleFollowPostAsync">
+                    @(IsPostFollowed ? "✓ Following" : "+ Follow post")
+                </button>
+            }
+        </div>
+
+        @if (showComments)
+        {
+            <ul class="list-unstyled comments mt-3 mb-0">
+                @foreach (var row in OrderedComments(Post))
+                {
+                    <li class="comment @(row.Depth > 0 ? "reply" : "")" style="margin-left: @(Math.Min(row.Depth, 4) * 1.25)rem">
+                        <a href="profile/@row.Comment.RegularUser.Username" class="fw-semibold text-decoration-none">@@@row.Comment.RegularUser.Username</a>
+                        <span class="small text-muted ms-1">@FormatDate(row.Comment.DatePosted)</span>
+                        <div>@row.Comment.Content</div>
+                        @{ var comment = row.Comment; var commentLikes = comment.LikeCount; }
+                        <div class="small text-muted comment-likes d-flex align-items-center gap-3">
+                            @if (CurrentUser.User is { } viewer && viewer.Id != comment.RegularUserId)
+                            {
+                                var liked = IsCommentLiked(comment.Id);
+                                <button type="button" class="btn btn-link p-0 text-decoration-none action like-btn @(liked ? "liked" : "")"
+                                        disabled="@(togglingCommentLikeId == comment.Id)"
+                                        aria-pressed="@(liked ? "true" : "false")"
+                                        title="@(liked ? "Unlike" : "Like")"
+                                        @onclick="() => ToggleCommentLikeAsync(comment)">
+                                    @HeartIcon(liked) @commentLikes @(commentLikes == 1 ? "like" : "likes")
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="action">@HeartIcon(false) @commentLikes @(commentLikes == 1 ? "like" : "likes")</span>
+                            }
+                            @if (row.ReplyCount > 0)
+                            {
+                                var commentId = row.Comment.Id;
+                                var open = expandedReplies.Contains(commentId);
+                                <button type="button" class="btn btn-link p-0 text-decoration-none replies-toggle"
+                                        aria-expanded="@(open ? "true" : "false")"
+                                        @onclick="() => ToggleReplies(commentId)">
+                                    @(open ? "Hide replies ▴" : $"{row.ReplyCount} {(row.ReplyCount == 1 ? "reply" : "replies")} ▾")
+                                </button>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public Post Post { get; set; } = null!;
+
+    /// <summary>
+    /// Ids of posts the signed-in user has liked (the page loads them with
+    /// PostService.GetLikedPostIdsByUserIdAsync). Shared by every card on the page and
+    /// updated in place when a like is toggled.
+    /// </summary>
+    [Parameter] public HashSet<int>? LikedPostIds { get; set; }
+
+    /// <summary>Ids of comments the signed-in user has liked (CommentService.GetLikedCommentIdsByUserIdAsync).</summary>
+    [Parameter] public HashSet<int>? LikedCommentIds { get; set; }
+
+    // Fallbacks if a page doesn't pass the sets in.
+    private readonly HashSet<int> localLikedPostIds = new();
+    private readonly HashSet<int> localLikedCommentIds = new();
+    private HashSet<int> LikedPosts => LikedPostIds ?? localLikedPostIds;
+    private HashSet<int> LikedComments => LikedCommentIds ?? localLikedCommentIds;
+
+    private bool IsPostLiked => LikedPosts.Contains(Post.Id);
+    private bool IsCommentLiked(int commentId) => LikedComments.Contains(commentId);
+
+    // Counts always come from Post/Comment.LikeCount.
+    private bool isTogglingPostLike;
+    private string? likeError;
+    private int? togglingCommentLikeId;
+
+    private async Task TogglePostLikeAsync()
+    {
+        if (CurrentUser.User is not { } me)
+        {
+            return;
+        }
+
+        isTogglingPostLike = true;
+        likeError = null;
+        try
+        {
+            var liked = await PostService.ToggleLikePostAsync(me.Id, Post.Id);
+            Post.LikeCount = Math.Max(0, Post.LikeCount + (liked ? 1 : -1));
+            if (liked) LikedPosts.Add(Post.Id); else LikedPosts.Remove(Post.Id);
+        }
+        catch (Exception ex)
+        {
+            likeError = ex.Message;
+        }
+        finally
+        {
+            isTogglingPostLike = false;
+        }
+    }
+
+    private async Task ToggleCommentLikeAsync(Comment comment)
+    {
+        if (CurrentUser.User is not { } me)
+        {
+            return;
+        }
+
+        togglingCommentLikeId = comment.Id;
+        try
+        {
+            var liked = await CommentService.ToggleLikeCommentAsync(me.Id, comment.Id);
+            comment.LikeCount = Math.Max(0, comment.LikeCount + (liked ? 1 : -1));
+            if (liked) LikedComments.Add(comment.Id); else LikedComments.Remove(comment.Id);
+        }
+        catch
+        {
+            // Leave the count as it was; the next page load shows the real value.
+        }
+        finally
+        {
+            togglingCommentLikeId = null;
+        }
+    }
+
+    private bool isTogglingPostFollow;
+    private string? postFollowError;
+
+    private bool IsPostFollowed =>
+        CurrentUser.User is { } me && Post.PostFollows.Any(f => f.RegularUserId == me.Id);
+
+    private async Task ToggleFollowPostAsync()
+    {
+        if (CurrentUser.User is not { } me)
+        {
+            return;
+        }
+
+        isTogglingPostFollow = true;
+        postFollowError = null;
+        try
+        {
+            var followed = await PostService.ToggleFollowPostAsync(me.Id, Post.Id);
+
+            // Keep the loaded post in sync so the button reflects the new state.
+            if (followed)
+            {
+                Post.PostFollows.Add(new PostFollow { RegularUserId = me.Id, PostId = Post.Id });
+            }
+            else
+            {
+                foreach (var f in Post.PostFollows.Where(f => f.RegularUserId == me.Id).ToList())
+                {
+                    Post.PostFollows.Remove(f);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            postFollowError = ex.Message;
+        }
+        finally
+        {
+            isTogglingPostFollow = false;
+        }
+    }
+
+    /// <summary>Whether the signed-in user follows this post's author (drives the Follow button).</summary>
+    [Parameter] public bool IsFollowingAuthor { get; set; }
+
+    /// <summary>Raised when the author is followed (true) or unfollowed (false) from this card.</summary>
+    [Parameter] public EventCallback<bool> OnFollowToggled { get; set; }
+
+    private bool showComments;
+
+    // Comments whose replies are currently shown. Replies start hidden behind a "replies" button.
+    private readonly HashSet<int> expandedReplies = new();
+
+    private void ToggleReplies(int commentId)
+    {
+        if (!expandedReplies.Remove(commentId))
+        {
+            expandedReplies.Add(commentId);
+        }
+    }
+
+    private record CommentRow(Comment Comment, int Depth, int ReplyCount);
+
+    /// <summary>
+    /// Flattens a post's comments into thread order: each comment followed by its replies,
+    /// but only for comments whose replies have been expanded.
+    /// </summary>
+    private IEnumerable<CommentRow> OrderedComments(Post post)
+    {
+        var ids = post.Comments.Select(c => c.Id).ToHashSet();
+        var children = post.Comments
+            .Where(c => c.ParentCommentId is int p && ids.Contains(p))
+            .ToLookup(c => c.ParentCommentId!.Value);
+
+        IEnumerable<CommentRow> Walk(Comment c, int depth)
+        {
+            var replies = children[c.Id].OrderBy(x => x.DatePosted).ToList();
+            yield return new CommentRow(c, depth, replies.Count);
+
+            if (!expandedReplies.Contains(c.Id))
+            {
+                yield break;
+            }
+
+            foreach (var child in replies)
+            {
+                foreach (var row in Walk(child, depth + 1))
+                {
+                    yield return row;
+                }
+            }
+        }
+
+        // Top-level comments, plus any whose parent isn't in the list (treated as top-level).
+        return post.Comments
+            .Where(c => c.ParentCommentId is not int p || !ids.Contains(p))
+            .OrderBy(c => c.DatePosted)
+            .SelectMany(c => Walk(c, 0));
+    }
+
+    public static string Initials(RegularUser user) =>
+        $"{user.FirstName.FirstOrDefault()}{user.LastName.FirstOrDefault()}".ToUpperInvariant();
+
+    public static string FormatDate(DateTime date) => date.ToString("MMM d, yyyy · h:mm tt");
+
+    // Outline icons for the action row (they take the text color, so they match the theme).
+    private static RenderFragment HeartIcon(bool filled) => __builder =>
+    {
+        <svg class="icon @(filled ? "filled" : "")" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z" />
+        </svg>
+    };
+
+    private static readonly RenderFragment CommentIcon = __builder =>
+    {
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-4-.9L3 20l1.1-4.2A8.4 8.4 0 0 1 3 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z" />
+        </svg>
+    };
+
+    private static readonly RenderFragment RepostIcon = __builder =>
+    {
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m17 1 4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><path d="m7 23-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
+        </svg>
+    };
+}

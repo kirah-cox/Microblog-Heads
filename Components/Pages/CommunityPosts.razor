@@ -1,0 +1,224 @@
+@page "/community/{CommunityId:int}"
+@rendermode InteractiveServer
+@implements IDisposable
+@using microblog_heads.Models
+@inject CommunityService CommunityService
+@inject DisplayService DisplayService
+@inject UserService UserService
+@inject CurrentUserState CurrentUser
+@inject PostService PostService
+@inject CommentService CommentService
+@inject NavigationManager Navigation
+
+@* All posts in one community, newest first. Reached by clicking a community name on a post. *@
+
+<PageTitle>@(community?.Name ?? "Community")</PageTitle>
+
+<div class="feed mx-auto">
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center mt-5">
+            <div class="spinner-border text-secondary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-4">@errorMessage</div>
+    }
+    else if (community is null)
+    {
+        <div class="alert alert-warning mt-4">That community doesn't exist.</div>
+    }
+    else
+    {
+        <section class="card shadow-sm mb-4">
+            <div class="card-body p-4 d-flex align-items-start gap-3">
+                <div class="avatar avatar-md" aria-hidden="true">@community.Name.FirstOrDefault()</div>
+                <div class="min-w-0 flex-fill">
+                    <h1 class="h3 mb-1">@community.Name</h1>
+                    <p class="mb-2 community-description">@community.Description</p>
+                    <div class="text-muted small">@posts.Count @(posts.Count == 1 ? "post" : "posts"), newest first</div>
+
+                @if (CurrentUser.IsLoggedIn)
+                {
+                    <div class="mt-3">
+                        @if (myRole is not null)
+                        {
+                            @* There's no leave-community service yet, so membership is shown, not toggled. *@
+                            <span class="badge rounded-pill member-badge">✓ Member · @myRole</span>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-primary rounded-pill join-btn" disabled="@isJoining"
+                                    title="Join to see @community.Name's posts on your Following page"
+                                    @onclick="JoinAsync">
+                                @(isJoining ? "Joining..." : "Join")
+                            </button>
+                        }
+                        @if (!string.IsNullOrEmpty(joinError))
+                        {
+                            <div class="text-danger small mt-1">@joinError</div>
+                        }
+                    </div>
+                }
+                </div>
+            </div>
+        </section>
+
+        @if (posts.Count == 0)
+        {
+            <div class="text-muted text-center py-5 border rounded bg-light">
+                No posts in @community.Name yet.
+            </div>
+        }
+        else
+        {
+            @foreach (var post in posts)
+            {
+                var authorId = post.RegularUserId;
+                <PostCard Post="post" @key="post.Id" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds"
+                          IsFollowingAuthor="followingIds.Contains(authorId)"
+                          OnFollowToggled="following => SetFollowing(authorId, following)" />
+            }
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int CommunityId { get; set; }
+
+    private Community? community;
+    private List<Post> posts = new();
+    private readonly HashSet<int> followingIds = new(); // users the signed-in user follows
+    private readonly HashSet<int> likedPostIds = new();    // posts the signed-in user liked
+    private readonly HashSet<int> likedCommentIds = new(); // comments the signed-in user liked
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? myRole; // signed-in user's role here (Admin/Moderator/Follower), null if not a member
+    private bool isJoining;
+    private string? joinError;
+
+    protected override void OnInitialized()
+    {
+        CurrentUser.Changed += OnCurrentUserChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Runs again when moving between communities without leaving this page.
+        if (CurrentUser.IsInitialized)
+        {
+            await LoadAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Who is signed in lives in browser storage, which is only readable once interactive.
+        // Finishing initialization raises Changed, which triggers the load (OnCurrentUserChanged).
+        if (firstRender && !CurrentUser.IsInitialized)
+        {
+            await CurrentUser.InitializeAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        // Only logged-in users can see community pages; everyone else goes to the login page.
+        if (CurrentUser.User is null)
+        {
+            Navigation.NavigateTo("login", replace: true);
+            return;
+        }
+
+        try
+        {
+            community = await CommunityService.GetCommunityByIdAsync(CommunityId);
+            posts = community is null ? new() : await DisplayService.GetPostsCommunityIDAsync(CommunityId);
+
+            followingIds.Clear();
+            myRole = null;
+            joinError = null;
+            if (CurrentUser.User is { } me)
+            {
+                followingIds.UnionWith((await UserService.GetFollowingAsync(me.Id)).Select(u => u.Id));
+                await LoadLikesAsync(me.Id);
+                myRole = await GetMyRoleAsync(me.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Couldn't load this community: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<string?> GetMyRoleAsync(int userId) =>
+        (await CommunityService.GetCommunityRolesByUserIdAsync(userId))
+            .FirstOrDefault(r => r.CommunityId == CommunityId)?.CommunityRole.Role;
+
+    private async Task JoinAsync()
+    {
+        if (CurrentUser.User is not { } me)
+        {
+            return;
+        }
+
+        isJoining = true;
+        joinError = null;
+        try
+        {
+            await CommunityService.JoinCommunityAsync(me.Id, CommunityId);
+            myRole = await GetMyRoleAsync(me.Id); // the service assigns the "Follower" role
+        }
+        catch (Exception ex)
+        {
+            joinError = ex.Message;
+        }
+        finally
+        {
+            isJoining = false;
+        }
+    }
+
+    private void SetFollowing(int authorId, bool following)
+    {
+        // Updates every card by this author, not just the one that was clicked.
+        if (following)
+        {
+            followingIds.Add(authorId);
+        }
+        else
+        {
+            followingIds.Remove(authorId);
+        }
+    }
+
+    /// <summary>Loads what the signed-in user has liked, so hearts show as liked after a reload or a new login.</summary>
+    private async Task LoadLikesAsync(int myId)
+    {
+        likedPostIds.Clear();
+        likedPostIds.UnionWith(await PostService.GetLikedPostIdsByUserIdAsync(myId));
+        likedCommentIds.Clear();
+        likedCommentIds.UnionWith(await CommentService.GetLikedCommentIdsByUserIdAsync(myId));
+    }
+
+    private void OnCurrentUserChanged() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        CurrentUser.Changed -= OnCurrentUserChanged;
+    }
+}

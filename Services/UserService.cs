@@ -1,11 +1,14 @@
 using microblog_heads.Data;
 using microblog_heads.Models;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace microblog_heads.Services;
 
 public class UserService
 {
+    private const string UniqueEmailIndex = "uq_regular_user_email_ci";
+
     private readonly IDbContextFactory<AppDbContext> _dbFactory;
 
     public UserService(IDbContextFactory<AppDbContext> dbFactory)
@@ -35,6 +38,20 @@ public class UserService
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
 
+        // Usernames and emails are unique case-insensitively (see the
+        // uq_regular_user_*_ci indexes); check up front for a friendly message.
+        var usernameLower = username.ToLower();
+        var emailLower = email.ToLower();
+
+        if (await db.RegularUsers.AnyAsync(u => u.Username.ToLower() == usernameLower))
+        {
+            throw new Exception("That username is already taken.");
+        }
+        if (await db.RegularUsers.AnyAsync(u => u.Email.ToLower() == emailLower))
+        {
+            throw new Exception("An account with that email already exists.");
+        }
+
         var user = new RegularUser
         {
             FirstName = firstName,
@@ -48,6 +65,13 @@ public class UserService
         {
             db.RegularUsers.Add(user);
             await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg)
+        {
+            // Someone else registered the same username/email between the check and the insert.
+            throw new Exception(pg.ConstraintName == UniqueEmailIndex
+                ? "An account with that email already exists."
+                : "That username is already taken.", ex);
         }
         catch (DbUpdateException ex)
         {
@@ -123,6 +147,15 @@ public class UserService
         return await db.Followers
             .Where(f => f.RegularUserFollowingId == userId)
             .Select(f => f.RegularUserFollower)
+            .ToListAsync();
+    }
+
+    public async Task<List<RegularUser>> GetFollowingAsync(int userId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.Followers
+            .Where(f => f.RegularUserFollowerId == userId)
+            .Select(f => f.RegularUserFollowing)
             .ToListAsync();
     }
 

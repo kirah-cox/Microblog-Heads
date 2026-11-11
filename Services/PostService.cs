@@ -76,7 +76,42 @@ public class PostService
         };
 
         db.PostLikes.Add(like);
-                   
+
+        await db.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<List<int>> GetLikedPostIdsByUserIdAsync(int userId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.PostLikes
+            .Where(l => l.RegularUserId == userId)
+            .Select(l => l.PostId)
+            .ToListAsync();
+    }
+
+    public async Task<bool> ToggleFollowPostAsync (int userId, int postId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var existing = await db.PostFollows.FirstOrDefaultAsync(f => f.RegularUserId == userId && f.PostId == postId);
+        if (existing is not null)
+        {
+            db.PostFollows.Remove(existing);
+            await db.SaveChangesAsync();
+
+            return false; // if a follow exists, we are 'unfollowing' the post
+        }
+
+        var follow = new PostFollow
+        {
+            RegularUserId = userId,
+            PostId = postId
+        };
+
+        db.PostFollows.Add(follow);
+
         await db.SaveChangesAsync();
 
         return true;

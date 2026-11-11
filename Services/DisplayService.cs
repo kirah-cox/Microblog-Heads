@@ -16,10 +16,14 @@ public class DisplayService
     public async Task<List<Post>> GetPostsbyUserIDAsync(int userID)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        return await db.Posts
+        var posts = await db.Posts
             .Where(x => x.RegularUserId == userID)
             .Include(x => x.RegularUser)
-            .Include(x => x.PostLikes)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -27,15 +31,22 @@ public class DisplayService
                 .ThenInclude(c => c.RegularUser)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
+
+        await FillLikeCountsAsync(db, posts);
+        return posts;
     }
 
     public async Task<List<Post>> GetPostsCommunityIDAsync(int communityID)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        return await db.Posts
+        var posts = await db.Posts
             .Where(x => x.CommunityId == communityID)
             .Include(x => x.RegularUser)
-            .Include(x => x.PostLikes)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -43,6 +54,32 @@ public class DisplayService
                 .ThenInclude(c => c.RegularUser)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
+
+        await FillLikeCountsAsync(db, posts);
+        return posts;
+    }
+
+    public async Task<List<Post>> GetPostsHashTagIDAsync(int hashTagID)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var posts = await db.Posts
+            .Where(x => x.PostHashTags.Any(pht => pht.HashTagId == hashTagID))
+            .Include(x => x.RegularUser)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
+            .Include(x => x.PostFollows)
+            .Include(x => x.PostHashTags)
+                .ThenInclude(pht => pht.HashTag)
+            .Include(x => x.Comments)
+                .ThenInclude(c => c.RegularUser)
+            .OrderByDescending(x => x.DatePosted)
+            .ToListAsync();
+
+        await FillLikeCountsAsync(db, posts);
+        return posts;
     }
 
     public async Task<List<Post>> GetAllFollowedPostsbyUserIDAsync(int userID)
@@ -52,8 +89,14 @@ public class DisplayService
 
         var posts = await db.Posts
             .Where(x => x.PostFollows.Any(y => y.RegularUserId == userID))
+            // Leave out reposts of a blocked user's post.
+            .Where(x => x.ParentPost == null || !blockedIds.Contains(x.ParentPost.RegularUserId))
             .Include(x => x.RegularUser)
-            .Include(x => x.PostLikes)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -63,6 +106,7 @@ public class DisplayService
             .ToListAsync();
 
         RemoveBlockedComments(posts, blockedIds);
+        await FillLikeCountsAsync(db, posts);
         return posts;
     }
 
@@ -74,8 +118,14 @@ public class DisplayService
         var posts = await db.Posts
             .Where(x => x.RegularUser.FollowerRegularUserFollowings
                 .Any(y => y.RegularUserFollowerId == userID))
+            // Leave out reposts of a blocked user's post.
+            .Where(x => x.ParentPost == null || !blockedIds.Contains(x.ParentPost.RegularUserId))
             .Include(x => x.RegularUser)
-            .Include(x => x.PostLikes)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -85,6 +135,7 @@ public class DisplayService
             .ToListAsync();
 
         RemoveBlockedComments(posts, blockedIds);
+        await FillLikeCountsAsync(db, posts);
         return posts;
     }
 
@@ -97,8 +148,14 @@ public class DisplayService
             .Where(x => x.Community != null && x.Community.CommunityUserRoles
                 .Any(y => y.RegularUserId == userID))
             .Where(x => !blockedIds.Contains(x.RegularUserId))
+            // Leave out reposts of a blocked user's post.
+            .Where(x => x.ParentPost == null || !blockedIds.Contains(x.ParentPost.RegularUserId))
             .Include(x => x.RegularUser)
-            .Include(x => x.PostLikes)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -108,6 +165,7 @@ public class DisplayService
             .ToListAsync();
 
         RemoveBlockedComments(posts, blockedIds);
+        await FillLikeCountsAsync(db, posts);
         return posts;
     }
 
@@ -123,8 +181,14 @@ public class DisplayService
         var posts = await db.Posts
             .Where(x => x.PostHashTags.Any(pht => followedTagIds.Contains(pht.HashTagId)))
             .Where(x => !blockedIds.Contains(x.RegularUserId))
+            // Leave out reposts of a blocked user's post.
+            .Where(x => x.ParentPost == null || !blockedIds.Contains(x.ParentPost.RegularUserId))
             .Include(x => x.RegularUser)
-            .Include(x => x.PostLikes)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -134,6 +198,7 @@ public class DisplayService
             .ToListAsync();
 
         RemoveBlockedComments(posts, blockedIds);
+        await FillLikeCountsAsync(db, posts);
         return posts;
     }
 
@@ -153,7 +218,7 @@ public class DisplayService
             .ToList();
     }
 
-    public async Task<List<Post>> GetForYouPostsbyUserIDAsync(int userID, int count = 20)
+    public async Task<List<Post>> GetForYouPostsbyUserIDAsync(int userID)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
         var blockedIds = await GetBlockedUserIdsAsync(db, userID);
@@ -161,10 +226,14 @@ public class DisplayService
         var posts = await db.Posts
             .Where(x => x.RegularUserId != userID)
             .Where(x => !blockedIds.Contains(x.RegularUserId))
-            .OrderBy(x => EF.Functions.Random())
-            .Take(count)
+            // Leave out reposts of a blocked user's post.
+            .Where(x => x.ParentPost == null || !blockedIds.Contains(x.ParentPost.RegularUserId))
             .Include(x => x.RegularUser)
-            .Include(x => x.PostLikes)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -173,7 +242,12 @@ public class DisplayService
             .ToListAsync();
 
         RemoveBlockedComments(posts, blockedIds);
-        return posts;
+        await FillLikeCountsAsync(db, posts);
+
+        // Shuffle here rather than with ORDER BY RANDOM() in SQL: the Includes above return one
+        // row per post per hashtag/comment/like, and a random SQL order splits those rows up,
+        // which makes EF return the same post more than once.
+        return posts.OrderBy(_ => Random.Shared.Next()).ToList();
     }
 
     private static async Task<List<int>> GetBlockedUserIdsAsync(AppDbContext db, int userID)
@@ -184,6 +258,43 @@ public class DisplayService
                 ? b.RegularUserBlockedId
                 : b.RegularUserBlockingId)
             .ToListAsync();
+    }
+
+    /// <summary>
+    /// Sets Post.LikeCount and Comment.LikeCount with two COUNT queries (one row per post /
+    /// comment), instead of loading every like row through Include.
+    /// </summary>
+    private static async Task FillLikeCountsAsync(AppDbContext db, List<Post> posts)
+    {
+        if (posts.Count == 0)
+        {
+            return;
+        }
+
+        var postIds = posts.Select(p => p.Id).ToList();
+        var postLikeCounts = await db.PostLikes
+            .Where(l => postIds.Contains(l.PostId))
+            .GroupBy(l => l.PostId)
+            .Select(g => new { PostId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.PostId, x => x.Count);
+
+        var commentIds = posts.SelectMany(p => p.Comments).Select(c => c.Id).ToList();
+        var commentLikeCounts = commentIds.Count == 0
+            ? new Dictionary<int, int>()
+            : await db.CommentLikes
+                .Where(l => commentIds.Contains(l.CommentId))
+                .GroupBy(l => l.CommentId)
+                .Select(g => new { CommentId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.CommentId, x => x.Count);
+
+        foreach (var post in posts)
+        {
+            post.LikeCount = postLikeCounts.GetValueOrDefault(post.Id);
+            foreach (var comment in post.Comments)
+            {
+                comment.LikeCount = commentLikeCounts.GetValueOrDefault(comment.Id);
+            }
+        }
     }
 
     private static void RemoveBlockedComments(List<Post> posts, List<int> blockedIds)

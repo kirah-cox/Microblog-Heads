@@ -2,17 +2,32 @@
     max-width: 720px;
 }
 
-.avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    border-radius: 50%;
-    color: #fff;
-    font-weight: 600;
-    background-image: linear-gradient(135deg, rgb(5, 39, 103) 0%, #3a0647 100%);
-    user-select: none;
+/* "N followers" stat: looks like the other stats, but is clickable. */
+.stat-link {
+    color: inherit;
+    text-decoration: none;
+    vertical-align: baseline;
+    border: 0;
 }
+
+    .stat-link span {
+        color: var(--bs-secondary-color);
+    }
+
+    .stat-link:hover span,
+    .stat-link:hover strong {
+        color: var(--mb-accent);
+        text-decoration: underline;
+    }
+
+.follower-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+    .follower-link:hover strong {
+        text-decoration: underline;
+    }
 
 .avatar-lg {
     width: 96px;
@@ -20,36 +35,45 @@
     font-size: 2rem;
 }
 
-.avatar-sm {
-    width: 40px;
-    height: 40px;
-    font-size: 0.9rem;
+/* Follow/Unfollow toggle for hashtags in the "Hashtags you follow" modal. */
+.tag-toggle {
+    min-width: 5rem;
+    padding: 0.1rem 0.6rem;
+    font-size: 0.8rem;
 }
 
-.post {
-    transition: box-shadow 0.15s ease-in-out;
-}
-
-    .post:hover {
-        box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+    .tag-toggle.following:hover:not(:disabled) {
+        color: var(--mb-danger);
+        border-color: var(--mb-danger);
+        background-color: transparent;
     }
 
-.post-content {
-    white-space: pre-wrap;
+.when-hover {
+    display: none;
+}
+
+.tag-toggle:hover:not(:disabled) .when-idle {
+    display: none;
+}
+
+.tag-toggle:hover:not(:disabled) .when-hover {
+    display: inline;
+}
+
+.min-w-0 {
+    min-width: 0;
+}
+
+.community-description {
     overflow-wrap: anywhere;
 }
 
-.comments {
-    border-top: 1px solid #e9ecef;
-    padding-top: 0.75rem;
+.block-btn {
+    min-width: 6.5rem;
 }
 
-.comment {
-    padding: 0.4rem 0;
-    overflow-wrap: anywhere;
+.block-toggle {
+    min-width: 5.5rem;
+    padding: 0.1rem 0.6rem;
+    font-size: 0.8rem;
 }
-
-    .comment.reply {
-        border-left: 2px solid #dee2e6;
-        padding-left: 0.75rem;
-    }

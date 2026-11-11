@@ -1,0 +1,28 @@
+button {
+    min-width: 6.5rem;
+}
+
+.follow-sm {
+    min-width: 5rem;
+    padding: 0.1rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+/* "Following" turns into an unfollow hint on hover. */
+.btn-outline-secondary:hover:not(:disabled) {
+    color: var(--mb-danger);
+    border-color: var(--mb-danger);
+    background-color: transparent;
+}
+
+.when-hover {
+    display: none;
+}
+
+button:hover:not(:disabled) .when-idle {
+    display: none;
+}
+
+button:hover:not(:disabled) .when-hover {
+    display: inline;
+}
