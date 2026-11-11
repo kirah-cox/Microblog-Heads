@@ -22,6 +22,10 @@
         <SearchComponent @rendermode="InteractiveServer" />
     </header>
 
+    @if (CurrentUser.IsLoggedIn)
+    {
+        <PostComposer OnPosted="LoadAsync"/>
+    }
     @* Logged-out users are redirected to /login, so they only see the spinner briefly. *@
     @if (!CurrentUser.IsInitialized || !CurrentUser.IsLoggedIn || isLoading)
     {
