@@ -1,0 +1,117 @@
+@page "/community/new"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject CommunityService CommunityService
+@inject CurrentUserState CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Create a community</PageTitle>
+
+<div class="feed mx-auto">
+    <h1 class="h3 mb-3">Create a community</h1>
+
+    @if (!CurrentUser.IsInitialized)
+    {
+        <div class="d-flex justify-content-center mt-5">
+            <div class="spinner-border text-secondary" role="status"></div>
+        </div>
+    }
+    else if (!CurrentUser.IsLoggedIn)
+    {
+        <div class="alert alert-info"><a href="login">Log in</a> to create a community.</div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input class="form-control" maxlength="50" @bind="name" @bind:event="oninput" />
+                    <small class="text-muted">@name.Length / 50</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" rows="3" @bind="description" @bind:event="oninput"></textarea>
+                    <small class="@(description.Length > 200 ? "text-danger" : "text-muted")">@description.Length / 200</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Parent community (optional)</label>
+                    <select class="form-select" @bind="parentId">
+                        <option value="">None (top-level community)</option>
+                        @foreach (var c in communities)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </select>
+                </div>
+
+                @if (error is not null)
+                {
+                    <div class="alert alert-danger">@error</div>
+                }
+
+                <button type="button" class="btn btn-primary" disabled="@isSaving" @onclick="CreateAsync">
+                    @(isSaving ? "Creating..." : "Create community")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string name = "";
+    private string description = "";
+    private int? parentId;
+    private List<Community> communities = new();
+    private string? error;
+    private bool isSaving;
+
+    protected override void OnInitialized()
+    {
+        CurrentUser.Changed += OnCurrentUserChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { communities = await CommunityService.GetAllCommunitiesAsync(); }
+        catch (Exception ex) { error = $"Couldn't load communities: {ex.Message}"; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !CurrentUser.IsInitialized)
+        {
+            await CurrentUser.InitializeAsync();
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (CurrentUser.User is not { } me) return;
+
+        error = null;
+        isSaving = true;
+        try
+        {
+            var created = await CommunityService.CreateCommunityAsync(me.Id, name, description, parentId);
+            Navigation.NavigateTo($"community/{created.Id}");
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void OnCurrentUserChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        CurrentUser.Changed -= OnCurrentUserChanged;
+    }
+}

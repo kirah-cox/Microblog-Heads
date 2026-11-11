@@ -66,7 +66,50 @@
                 </div>
             </div>
         </section>
+        @if (myRole is not null)
+        {
+            <PostComposer CommunityId="CommunityId" OnPosted="LoadAsync" />
+        }
 
+        <section class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Members (@members.Count)</h2>
+
+                @if (roleError is not null)
+                {
+                    <div class="alert alert-danger py-2">@roleError</div>
+                }
+
+                <ul class="list-group list-group-flush">
+                    @foreach (var m in members)
+                    {
+                        <li class="list-group-item d-flex align-items-center gap-3 px-0" @key="m.Id">
+                            <a href="profile/@m.RegularUser.Username" class="author-link flex-fill">
+                                <strong>@m.RegularUser.FirstName @m.RegularUser.LastName</strong>
+                                <span class="text-muted">@@@m.RegularUser.Username</span>
+                            </a>
+
+                            @if (myRole == "Admin")
+                            {
+                                <select class="form-select form-select-sm" style="width: auto"
+                                        value="@m.CommunityRole.Role"
+                                        disabled="@(changingRoleFor == m.RegularUserId)"
+                                        @onchange="e => ChangeRoleAsync(m, e.Value?.ToString() ?? m.CommunityRole.Role)">
+                                    @foreach (var r in roleOptions)
+                                    {
+                                        <option value="@r">@r</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <span class="badge rounded-pill text-bg-light border">@m.CommunityRole.Role</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        </section>
         @if (posts.Count == 0)
         {
             <div class="text-muted text-center py-5 border rounded bg-light">
@@ -99,12 +142,17 @@
     private string? myRole; // signed-in user's role here (Admin/Moderator/Follower), null if not a member
     private bool isJoining;
     private string? joinError;
+    private List<CommunityUserRole> members = new();
+    private readonly string[] roleOptions = { "Admin", "Moderator", "Follower" };
+    private int? changingRoleFor;   // RegularUserId of the member being changed
+    private string? roleError;
+
 
     protected override void OnInitialized()
     {
         CurrentUser.Changed += OnCurrentUserChanged;
     }
-
+    
     protected override async Task OnParametersSetAsync()
     {
         // Runs again when moving between communities without leaving this page.
@@ -123,7 +171,8 @@
             await CurrentUser.InitializeAsync();
         }
     }
-
+    private async Task LoadMembersAsync() =>
+    members = await CommunityService.GetCommunityMembersAsync(CommunityId);
     private async Task LoadAsync()
     {
         isLoading = true;
@@ -149,6 +198,7 @@
                 followingIds.UnionWith((await UserService.GetFollowingAsync(me.Id)).Select(u => u.Id));
                 await LoadLikesAsync(me.Id);
                 myRole = await GetMyRoleAsync(me.Id);
+                await LoadMembersAsync();
             }
         }
         catch (Exception ex)
@@ -178,6 +228,7 @@
         {
             await CommunityService.JoinCommunityAsync(me.Id, CommunityId);
             myRole = await GetMyRoleAsync(me.Id); // the service assigns the "Follower" role
+            await LoadMembersAsync();
         }
         catch (Exception ex)
         {
@@ -220,5 +271,27 @@
     public void Dispose()
     {
         CurrentUser.Changed -= OnCurrentUserChanged;
+    }
+
+    private async Task ChangeRoleAsync(CommunityUserRole member, string newRole)
+    {
+        if (CurrentUser.User is not { } me) return;
+
+        changingRoleFor = member.RegularUserId;
+        roleError = null;
+        try
+        {
+            await CommunityService.AssignRoleAsync(me.Id, CommunityId, member.RegularUserId, newRole);
+            myRole = await GetMyRoleAsync(me.Id);   // in case you changed your own role
+        }
+        catch (Exception ex)
+        {
+            roleError = ex.Message;   // e.g. "A community must keep at least one admin."
+        }
+        finally
+        {
+            await LoadMembersAsync();   // reload either way, so the dropdown shows the real role
+            changingRoleFor = null;
+        }
     }
 }

@@ -149,6 +149,16 @@ public class CommunityService
 
     }
 
+    public async Task<List<CommunityUserRole>> GetCommunityMembersAsync(int communityId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.CommunityUserRoles
+            .Where(r => r.CommunityId == communityId)
+            .Include(r => r.RegularUser)
+            .Include(r => r.CommunityRole)
+            .OrderBy(r => r.RegularUser.Username)
+            .ToListAsync();
+    }
     public async Task<List<CommunityUserRole>> GetCommunityRolesByUserIdAsync(int userId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();

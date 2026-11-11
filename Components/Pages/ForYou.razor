@@ -16,6 +16,10 @@
 <div class="feed mx-auto">
     <h1 class="h3 mb-3">For You</h1>
 
+    @if (CurrentUser.IsLoggedIn)
+    {
+        <PostComposer OnPosted="LoadAsync"/>
+    }
     @* Logged-out users are redirected to /login, so they only see the spinner briefly. *@
     @if (!CurrentUser.IsInitialized || !CurrentUser.IsLoggedIn || isLoading)
     {

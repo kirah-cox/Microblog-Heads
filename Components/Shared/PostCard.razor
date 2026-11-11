@@ -4,7 +4,7 @@
 @inject CurrentUserState CurrentUser
 
 @* Displays one post: author, date, content, hashtags, like count, an expandable
-   comment thread and a Follow post toggle. Expects the post to be loaded the way
+   comment thread, a repost box and a Follow post toggle. Expects the post to be loaded the way
    DisplayService loads posts (RegularUser, Community, ParentPost.RegularUser, ParentPost.Community,
    PostFollows, PostHashTags.HashTag and Comments.RegularUser included; LikeCount set on
    the post and its comments). *@
@@ -94,22 +94,17 @@
                 @* Your own post (or logged out): count only, no liking. *@
                 <span class="action">@HeartIcon(false) @Post.LikeCount <span class="action-label">@(Post.LikeCount == 1 ? "like" : "likes")</span></span>
             }
-            @if (Post.Comments.Count > 0)
-            {
-                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none action comments-btn @(showComments ? "open" : "")"
-                        aria-expanded="@(showComments ? "true" : "false")"
-                        @onclick="() => showComments = !showComments">
-                    @CommentIcon @Post.Comments.Count <span class="action-label">@(Post.Comments.Count == 1 ? "comment" : "comments")</span>
-                </button>
-            }
-            else
-            {
-                <span class="action">@CommentIcon 0 <span class="action-label">comments</span></span>
-            }
 
-            @* Placeholder: not wired up yet (no click handler). Will use PostService.CreateRepostAsync. *@
+            @* Always shown, so a post with no comments can still be opened to write the first one. *@
+            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none action comments-btn @(showComments ? "open" : "")"
+                    aria-expanded="@(showComments ? "true" : "false")"
+                    @onclick="() => showComments = !showComments">
+                @CommentIcon @Post.Comments.Count <span class="action-label">@(Post.Comments.Count == 1 ? "comment" : "comments")</span>
+            </button>
+
             <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none action repost-btn"
-                    title="Reposting isn't available yet">
+                    title="Repost"
+                    @onclick="() => showRepost = !showRepost">
                 @RepostIcon <span class="action-label">Repost</span>
             </button>
 
@@ -127,8 +122,35 @@
             }
         </div>
 
+        @if (showRepost)
+        {
+            <div class="mt-3">
+                <PostComposer OriginalPostId="Post.Id"
+                              Placeholder="Add a comment (optional)"
+                              ButtonText="Repost"
+                              OnPosted="@(() => showRepost = false)" />
+            </div>
+        }
+
         @if (showComments)
         {
+            @if (CurrentUser.IsLoggedIn)
+            {
+                <div class="mt-3">
+                    <textarea class="form-control form-control-sm" rows="2" placeholder="Write a comment..."
+                              @bind="commentText" @bind:event="oninput"></textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <small class="@(commentText.Length > 300 ? "text-danger" : "text-muted")">@commentText.Length / 300</small>
+                        <button type="button" class="btn btn-primary btn-sm" disabled="@isSavingComment"
+                                @onclick="() => SubmitCommentAsync(null)">Comment</button>
+                    </div>
+                    @if (commentError is not null && replyingToId is null)
+                    {
+                        <div class="text-danger small">@commentError</div>
+                    }
+                </div>
+            }
+
             <ul class="list-unstyled comments mt-3 mb-0">
                 @foreach (var row in OrderedComments(Post))
                 {
@@ -163,7 +185,33 @@
                                     @(open ? "Hide replies ▴" : $"{row.ReplyCount} {(row.ReplyCount == 1 ? "reply" : "replies")} ▾")
                                 </button>
                             }
+                            @if (CurrentUser.IsLoggedIn)
+                            {
+                                <button type="button" class="btn btn-link p-0 text-decoration-none replies-toggle"
+                                        @onclick="() => StartReply(comment.Id)">Reply</button>
+                            }
                         </div>
+
+                        @if (replyingToId == comment.Id)
+                        {
+                            <div class="mt-2">
+                                <textarea class="form-control form-control-sm" rows="2"
+                                          placeholder="@($"Reply to @{comment.RegularUser.Username}")"
+                                          @bind="commentText" @bind:event="oninput"></textarea>
+                                <div class="d-flex justify-content-between align-items-center mt-1">
+                                    <small class="@(commentText.Length > 300 ? "text-danger" : "text-muted")">@commentText.Length / 300</small>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelReply">Cancel</button>
+                                        <button type="button" class="btn btn-primary btn-sm" disabled="@isSavingComment"
+                                                @onclick="() => SubmitCommentAsync(comment.Id)">Reply</button>
+                                    </div>
+                                </div>
+                                @if (commentError is not null)
+                                {
+                                    <div class="text-danger small">@commentError</div>
+                                }
+                            </div>
+                        }
                     </li>
                 }
             </ul>
@@ -296,6 +344,57 @@
     [Parameter] public EventCallback<bool> OnFollowToggled { get; set; }
 
     private bool showComments;
+    private bool showRepost;
+
+    // Writing comments and replies. One text field is shared, because only one box is open at a time.
+    private string commentText = "";
+    private string? commentError;
+    private bool isSavingComment;
+    private int? replyingToId;
+
+    private void StartReply(int commentId)
+    {
+        replyingToId = commentId;
+        commentText = "";
+        commentError = null;
+    }
+
+    private void CancelReply()
+    {
+        replyingToId = null;
+        commentText = "";
+        commentError = null;
+    }
+
+    private async Task SubmitCommentAsync(int? parentCommentId)
+    {
+        if (CurrentUser.User is not { } me) return;
+
+        commentError = null;
+        isSavingComment = true;
+        try
+        {
+            var saved = await CommentService.CreateCommentAsync(me.Id, Post.Id, commentText, parentCommentId);
+
+            // The saved row has no author loaded, and the thread display needs one.
+            saved.RegularUser = me;
+            Post.Comments.Add(saved);
+
+            if (parentCommentId is int parent)
+                expandedReplies.Add(parent);   // open the replies so the new one is visible
+
+            commentText = "";
+            replyingToId = null;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            commentError = ex.Message;
+        }
+        finally
+        {
+            isSavingComment = false;
+        }
+    }
 
     // Comments whose replies are currently shown. Replies start hidden behind a "replies" button.
     private readonly HashSet<int> expandedReplies = new();

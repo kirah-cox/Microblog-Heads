@@ -126,6 +126,11 @@ else
 
         <h2 class="h5 mb-3">Posts</h2>
 
+        @if (IsOwnProfile)
+        {
+            <PostComposer OnPosted="LoadAsync" />
+        }
+
         @if (!string.IsNullOrEmpty(errorMessage))
         {
             <div class="alert alert-danger">@errorMessage</div>

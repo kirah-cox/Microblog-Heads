@@ -1,0 +1,60 @@
+@inject PostService PostService
+@inject CurrentUserState CurrentUser
+
+@if (CurrentUser.User is { } me)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <textarea class="form-control" rows="3" placeholder="@Placeholder"
+                      @bind="text" @bind:event="oninput"></textarea>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <small class="@(text.Length > 500 ? "text-danger" : "text-muted")">@text.Length / 500</small>
+                <button type="button" class="btn btn-primary btn-sm" disabled="@isSaving" @onclick="SubmitAsync">
+                    @(isSaving ? "Posting..." : ButtonText)
+                </button>
+            </div>
+            @if (error is not null)
+            {
+                <div class="text-danger small mt-1">@error</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int? CommunityId { get; set; }
+    [Parameter] public int? OriginalPostId { get; set; }   // set = this is a repost
+    [Parameter] public string Placeholder { get; set; } = "What's happening?";
+    [Parameter] public string ButtonText { get; set; } = "Post";
+    [Parameter] public EventCallback OnPosted { get; set; }
+
+    private string text = "";
+    private string? error;
+    private bool isSaving;
+
+    private async Task SubmitAsync()
+    {
+        if (CurrentUser.User is not { } me) return;
+
+        error = null;
+        isSaving = true;
+        try
+        {
+            if (OriginalPostId is int original)
+                await PostService.CreateRepostAsync(me.Id, original, text, CommunityId);
+            else
+                await PostService.CreatePostAsync(me.Id, text, CommunityId);
+
+            text = "";
+            await OnPosted.InvokeAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}
