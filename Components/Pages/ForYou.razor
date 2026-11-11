@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @using microblog_heads.Models
+@using microblog_heads.Components.Search
 @inject DisplayService DisplayService
 @inject UserService UserService
 @inject CurrentUserState CurrentUser
@@ -15,6 +16,11 @@
 
 <div class="feed mx-auto">
     <h1 class="h3 mb-3">For You</h1>
+
+    <!-- SearchBar -->
+    <header class="search-header">
+        <SearchComponent @rendermode="InteractiveServer" />
+    </header>
 
     @* Logged-out users are redirected to /login, so they only see the spinner briefly. *@
     @if (!CurrentUser.IsInitialized || !CurrentUser.IsLoggedIn || isLoading)
@@ -50,7 +56,7 @@
 @code {
     private List<Post> posts = new();
     private readonly HashSet<int> followingIds = new(); // authors the signed-in user follows
-    private readonly HashSet<int> likedPostIds = new();    // posts the signed-in user liked
+    private readonly HashSet<int> likedPostIds = new(); // posts the signed-in user liked
     private readonly HashSet<int> likedCommentIds = new(); // comments the signed-in user liked
     private bool isLoading;
     private string? errorMessage;

@@ -22,7 +22,7 @@ public class HashTagService
     public async Task<List<HashTag>> GetAllHashTagsAsync()
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        return await db.HashTags.ToListAsync();
+        return await db.HashTags.Include(h => h.PostHashTags).ToListAsync();
     }
 
     public async Task FollowHashTagAsync(int userId, int hashTagId)

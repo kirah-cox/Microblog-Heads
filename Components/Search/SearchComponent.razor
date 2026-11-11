@@ -1,0 +1,113 @@
+@using microblog_heads.Services
+@using microblog_heads.Models
+@inject UserService UserService
+@inject HashTagService HashTagService
+@inject NavigationManager Navigation
+
+<div class="search-container">
+    <input type="text" class="search-input" placeholder="Search users, hashtags..." @oninput="OnSearchInput"
+           @onfocus="OnFocus" @onblur="OnBlur" />
+
+    @if (showResults && (searchUsers.Any() || searchHashTags.Any()))
+    {
+        <div class="search-results">
+            @* Users Section *@
+            @if (searchUsers.Any())
+            {
+                <div class="results-section">
+                    <div class="results-header">Users</div>
+                    @foreach (var user in searchUsers)
+                    {
+                        <div class="search-result-item" @onclick="() => GoToProfile(user.Username)">
+                            <span>@user.FirstName @user.LastName</span>
+                            <span class="username">@@@user.Username</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            @* HashTags Section *@
+            @if (searchHashTags.Any())
+            {
+                <div class="results-section">
+                    <div class="results-header">Hashtags</div>
+                    @foreach (var tag in searchHashTags)
+                    {
+                        <div class="search-result-item" @onclick="() => GoToHashTag(tag.Id)">
+                            <span>#@tag.Name</span>
+                            <span class="tag-count">@tag.PostHashTags.Count posts</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string searchQuery = "";
+    private List<RegularUser> searchUsers = new();
+    private List<HashTag> searchHashTags = new();
+    private bool showResults = false;
+    private List<RegularUser> allUsers = new();
+    private List<HashTag> allHashTags = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // load all users from the database
+        allUsers = await UserService.GetAllUsersAsync();
+
+        // Load all hashtags from the database
+        allHashTags = await HashTagService.GetAllHashTagsAsync();
+
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? "";
+
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            searchUsers.Clear();
+            searchHashTags.Clear();
+            return;
+        }
+
+        var query = searchQuery.ToLower();
+
+        // Search Users
+        searchUsers = allUsers
+            .Where(u => u.Username.ToLower().Contains(query)
+                     || u.FirstName.ToLower().Contains(query)
+                     || u.LastName.ToLower().Contains(query))
+            .Take(3)
+            .ToList();
+
+        // Search HashTags
+        searchHashTags = allHashTags
+            .Where(h => h.Name.ToLower().Contains(query))
+            .Take(3)
+            .ToList();
+    }
+
+    private void OnFocus() => showResults = true;
+
+    private void OnBlur()
+    {
+        Task.Delay(100).ContinueWith(_ =>
+        {
+            showResults = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void GoToProfile(string username)
+    {
+        Navigation.NavigateTo($"profile/{username}");
+    }
+
+    private void GoToHashTag(int hashTagId)
+    {
+        Navigation.NavigateTo($"hashtag/{hashTagId}");
+    }
+}
