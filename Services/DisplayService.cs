@@ -29,6 +29,8 @@ public class DisplayService
                 .ThenInclude(pht => pht.HashTag)
             .Include(x => x.Comments)
                 .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
 
@@ -52,6 +54,8 @@ public class DisplayService
                 .ThenInclude(pht => pht.HashTag)
             .Include(x => x.Comments)
                 .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
 
@@ -75,6 +79,8 @@ public class DisplayService
                 .ThenInclude(pht => pht.HashTag)
             .Include(x => x.Comments)
                 .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
 
@@ -102,6 +108,8 @@ public class DisplayService
                 .ThenInclude(pht => pht.HashTag)
             .Include(x => x.Comments)
                 .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
 
@@ -131,6 +139,8 @@ public class DisplayService
                 .ThenInclude(pht => pht.HashTag)
             .Include(x => x.Comments)
                 .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
 
@@ -161,6 +171,8 @@ public class DisplayService
                 .ThenInclude(pht => pht.HashTag)
             .Include(x => x.Comments)
                 .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
 
@@ -194,6 +206,8 @@ public class DisplayService
                 .ThenInclude(pht => pht.HashTag)
             .Include(x => x.Comments)
                 .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
             .OrderByDescending(x => x.DatePosted)
             .ToListAsync();
 
@@ -239,6 +253,8 @@ public class DisplayService
                 .ThenInclude(pht => pht.HashTag)
             .Include(x => x.Comments)
                 .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
             .ToListAsync();
 
         RemoveBlockedComments(posts, blockedIds);

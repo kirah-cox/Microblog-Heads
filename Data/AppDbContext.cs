@@ -169,6 +169,9 @@ public partial class AppDbContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("name");
             entity.Property(e => e.ParentCommunityId).HasColumnName("parent_community_id");
+            entity.Property(e => e.IsPrivate)
+                .HasDefaultValue(false)
+                .HasColumnName("is_private");
 
             entity.HasOne(d => d.ParentCommunity).WithMany(p => p.InverseParentCommunity)
                 .HasForeignKey(d => d.ParentCommunityId)

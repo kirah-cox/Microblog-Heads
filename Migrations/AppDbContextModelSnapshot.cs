@@ -178,6 +178,12 @@ namespace microblog_heads.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("description");
 
+                    b.Property<bool>("IsPrivate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_private");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
