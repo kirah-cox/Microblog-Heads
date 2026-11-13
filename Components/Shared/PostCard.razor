@@ -36,7 +36,23 @@
         </div>
 
         <p class="post-content mb-2">@Post.Content</p>
-
+        @if (Post.PostMedia.Count > 0)
+        {
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                @foreach (var pm in Post.PostMedia)
+                {
+                    var url = "/media/" + pm.Media.Path;
+                    @if (MediaService.IsVideo(pm.Media.Path))
+                    {
+                        <video src="@url" controls class="post-media"></video>
+                    }
+                    else
+                    {
+                        <img src="@url" alt="Post attachment" class="post-media" loading="lazy" />
+                    }
+                }
+            </div>
+        }
         @if (Post.ParentPost is { } original)
         {
             @* The post being reposted, shown as a quoted card. *@

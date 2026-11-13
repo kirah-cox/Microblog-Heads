@@ -27,10 +27,12 @@ public class PostService
             .ToListAsync();
     }
 
-    public async Task<Post> CreatePostAsync(int userId, string content, int? communityId = null)
+    public async Task<Post> CreatePostAsync(int userId, string content, int? communityId = null, IEnumerable<string>? mediaFileNames = null)
     {
+        var files = mediaFileNames?.ToList() ?? new List<string>();
+        
         content = content?.Trim() ?? ""; // optional, we may wish to keep white space in later versions
-        if (content.Length == 0) 
+        if (content.Length == 0 && files.Count == 0) 
             throw new ArgumentException("A post cannot be empty");
         if (content.Length > 500) 
             throw new ArgumentException("A post cannot exceed 500 characters");
@@ -42,7 +44,8 @@ public class PostService
             RegularUserId = userId,
             Content = content,
             DatePosted = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), // column is "timestamp without time zone"; Npgsql rejects Kind=Utc
-            CommunityId = communityId
+            CommunityId = communityId,
+            PostMedia = files.Select(f => new PostMedia { Media = new Media { Path = f } }).ToList()
         };
         try 
         {
