@@ -20,6 +20,7 @@ public partial class RegularUser
     public int UserRoleID { get; set; }
 
     public virtual UserRole UserRole { get; set; } = null!;
+    public virtual ICollection<CommunityJoinRequest> CommunityJoinRequests { get; set; } = new List<CommunityJoinRequest>();
 
     public virtual ICollection<BlockedUser> BlockedUserRegularUserBlockeds { get; set; } = new List<BlockedUser>();
 

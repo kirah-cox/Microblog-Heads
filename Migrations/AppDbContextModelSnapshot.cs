@@ -205,6 +205,38 @@ namespace microblog_heads.Migrations
                     b.ToTable("community", "Microblog");
                 });
 
+            modelBuilder.Entity("microblog_heads.Models.CommunityJoinRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CommunityId")
+                        .HasColumnType("integer")
+                        .HasColumnName("community_id");
+
+                    b.Property<DateTime>("DateRequested")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date_requested");
+
+                    b.Property<int>("RegularUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("regular_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("community_join_request_pkey");
+
+                    b.HasIndex("RegularUserId");
+
+                    b.HasIndex(new[] { "CommunityId", "RegularUserId" }, "uq_join_request")
+                        .IsUnique();
+
+                    b.ToTable("community_join_request", "Microblog");
+                });
+
             modelBuilder.Entity("microblog_heads.Models.CommunityRole", b =>
                 {
                     b.Property<int>("Id")
@@ -749,6 +781,27 @@ namespace microblog_heads.Migrations
                     b.Navigation("ParentCommunity");
                 });
 
+            modelBuilder.Entity("microblog_heads.Models.CommunityJoinRequest", b =>
+                {
+                    b.HasOne("microblog_heads.Models.Community", "Community")
+                        .WithMany("CommunityJoinRequests")
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_join_request_community");
+
+                    b.HasOne("microblog_heads.Models.RegularUser", "RegularUser")
+                        .WithMany("CommunityJoinRequests")
+                        .HasForeignKey("RegularUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_join_request_user");
+
+                    b.Navigation("Community");
+
+                    b.Navigation("RegularUser");
+                });
+
             modelBuilder.Entity("microblog_heads.Models.CommunityUserRole", b =>
                 {
                     b.HasOne("microblog_heads.Models.Community", "Community")
@@ -977,6 +1030,8 @@ namespace microblog_heads.Migrations
 
             modelBuilder.Entity("microblog_heads.Models.Community", b =>
                 {
+                    b.Navigation("CommunityJoinRequests");
+
                     b.Navigation("CommunityUserRoles");
 
                     b.Navigation("InverseParentCommunity");
@@ -1029,6 +1084,8 @@ namespace microblog_heads.Migrations
                     b.Navigation("CommentMissuses");
 
                     b.Navigation("Comments");
+
+                    b.Navigation("CommunityJoinRequests");
 
                     b.Navigation("CommunityUserRoles");
 

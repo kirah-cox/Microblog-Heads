@@ -11,6 +11,7 @@ public partial class AppDbContext : DbContext
         : base(options)
     {
     }
+    public virtual DbSet<CommunityJoinRequest> CommunityJoinRequests { get; set; }
 
     public virtual DbSet<BlockedUser> BlockedUsers { get; set; }
 
@@ -52,6 +53,29 @@ public partial class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<CommunityJoinRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("community_join_request_pkey");
+
+            entity.ToTable("community_join_request", "Microblog");
+
+            entity.HasIndex(e => new { e.CommunityId, e.RegularUserId }, "uq_join_request").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CommunityId).HasColumnName("community_id");
+            entity.Property(e => e.RegularUserId).HasColumnName("regular_user_id");
+            entity.Property(e => e.DateRequested)
+                .HasColumnName("date_requested")
+                .HasColumnType("timestamp without time zone");
+
+            entity.HasOne(d => d.Community).WithMany(p => p.CommunityJoinRequests)
+                .HasForeignKey(d => d.CommunityId)
+                .HasConstraintName("fk_join_request_community");
+
+            entity.HasOne(d => d.RegularUser).WithMany(p => p.CommunityJoinRequests)
+                .HasForeignKey(d => d.RegularUserId)
+                .HasConstraintName("fk_join_request_user");
+        });
         modelBuilder.Entity<BlockedUser>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("blocked_users_pkey");

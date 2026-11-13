@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using microblog_heads.Data;
+using microblog_heads.Migrations;
 using microblog_heads.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,7 +27,8 @@ public class CommunityService
         return await db.Communities.ToListAsync();
     }
 
-    public async Task<Community> CreateCommunityAsync(int userId, string name, string description, int? parentCommunityId = null )
+    public async Task<Community> CreateCommunityAsync(int userId, string name, string description, 
+                                int? parentCommunityId = null, bool isPrivate = false )
     {
         description = description?.Trim() ?? "";
         name = name?.Trim() ??"";
@@ -58,6 +60,7 @@ public class CommunityService
             Name = name,
             Description = description,
             ParentCommunityId = parentCommunityId,
+            IsPrivate = isPrivate,
             CommunityUserRoles = new List<CommunityUserRole>
             {
                 new CommunityUserRole
