@@ -32,6 +32,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<HashTagFollow> HashTagFollows { get; set; }
 
+    public virtual DbSet<Media> Media { get; set; }
+
     public virtual DbSet<Post> Posts { get; set; }
 
     public virtual DbSet<PostFollow> PostFollows { get; set; }
@@ -39,6 +41,8 @@ public partial class AppDbContext : DbContext
     public virtual DbSet<PostHashTag> PostHashTags { get; set; }
 
     public virtual DbSet<PostLike> PostLikes { get; set; }
+
+    public virtual DbSet<PostMedia> PostMedia { get; set; }
 
     public virtual DbSet<PostMissuse> PostMissuses { get; set; }
 
@@ -267,6 +271,18 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("fk_hash_tag_follow_user");
         });
 
+        modelBuilder.Entity<Media>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("media_pkey");
+
+            entity.ToTable("media", "Microblog");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Path)
+                .HasMaxLength(500)
+                .HasColumnName("path");
+        });
+
         modelBuilder.Entity<Post>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("post_pkey");
@@ -358,6 +374,27 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.RegularUser).WithMany(p => p.PostLikes)
                 .HasForeignKey(d => d.RegularUserId)
                 .HasConstraintName("fk_post_like_user");
+        });
+
+        modelBuilder.Entity<PostMedia>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("post_media_pkey");
+
+            entity.ToTable("post_media", "Microblog");
+
+            entity.HasIndex(e => new { e.PostId, e.MediaId }, "uq_post_media").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.MediaId).HasColumnName("media_id");
+            entity.Property(e => e.PostId).HasColumnName("post_id");
+
+            entity.HasOne(d => d.Media).WithMany(p => p.PostMedia)
+                .HasForeignKey(d => d.MediaId)
+                .HasConstraintName("fk_post_media_media");
+
+            entity.HasOne(d => d.Post).WithMany(p => p.PostMedia)
+                .HasForeignKey(d => d.PostId)
+                .HasConstraintName("fk_post_media_post");
         });
 
         modelBuilder.Entity<PostMissuse>(entity =>

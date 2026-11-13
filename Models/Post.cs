@@ -31,6 +31,8 @@ public partial class Post
 
     public virtual ICollection<PostLike> PostLikes { get; set; } = new List<PostLike>();
 
+    public virtual ICollection<PostMedia> PostMedia { get; set; } = new List<PostMedia>();
+
     public virtual ICollection<PostMissuse> PostMissuses { get; set; } = new List<PostMissuse>();
 
     public virtual RegularUser RegularUser { get; set; } = null!;

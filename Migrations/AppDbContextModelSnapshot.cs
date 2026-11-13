@@ -334,6 +334,27 @@ namespace microblog_heads.Migrations
                     b.ToTable("hash_tag_follow", "Microblog");
                 });
 
+            modelBuilder.Entity("microblog_heads.Models.Media", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("path");
+
+                    b.HasKey("Id")
+                        .HasName("media_pkey");
+
+                    b.ToTable("media", "Microblog");
+                });
+
             modelBuilder.Entity("microblog_heads.Models.Post", b =>
                 {
                     b.Property<int>("Id")
@@ -459,6 +480,34 @@ namespace microblog_heads.Migrations
                         .IsUnique();
 
                     b.ToTable("post_like", "Microblog");
+                });
+
+            modelBuilder.Entity("microblog_heads.Models.PostMedia", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("MediaId")
+                        .HasColumnType("integer")
+                        .HasColumnName("media_id");
+
+                    b.Property<int>("PostId")
+                        .HasColumnType("integer")
+                        .HasColumnName("post_id");
+
+                    b.HasKey("Id")
+                        .HasName("post_media_pkey");
+
+                    b.HasIndex("MediaId");
+
+                    b.HasIndex(new[] { "PostId", "MediaId" }, "uq_post_media")
+                        .IsUnique();
+
+                    b.ToTable("post_media", "Microblog");
                 });
 
             modelBuilder.Entity("microblog_heads.Models.PostMissuse", b =>
@@ -857,6 +906,27 @@ namespace microblog_heads.Migrations
                     b.Navigation("RegularUser");
                 });
 
+            modelBuilder.Entity("microblog_heads.Models.PostMedia", b =>
+                {
+                    b.HasOne("microblog_heads.Models.Media", "Media")
+                        .WithMany("PostMedia")
+                        .HasForeignKey("MediaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_media_media");
+
+                    b.HasOne("microblog_heads.Models.Post", "Post")
+                        .WithMany("PostMedia")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_media_post");
+
+                    b.Navigation("Media");
+
+                    b.Navigation("Post");
+                });
+
             modelBuilder.Entity("microblog_heads.Models.PostMissuse", b =>
                 {
                     b.HasOne("microblog_heads.Models.Post", "Post")
@@ -920,6 +990,11 @@ namespace microblog_heads.Migrations
                     b.Navigation("PostHashTags");
                 });
 
+            modelBuilder.Entity("microblog_heads.Models.Media", b =>
+                {
+                    b.Navigation("PostMedia");
+                });
+
             modelBuilder.Entity("microblog_heads.Models.Post", b =>
                 {
                     b.Navigation("Comments");
@@ -931,6 +1006,8 @@ namespace microblog_heads.Migrations
                     b.Navigation("PostHashTags");
 
                     b.Navigation("PostLikes");
+
+                    b.Navigation("PostMedia");
 
                     b.Navigation("PostMissuses");
                 });

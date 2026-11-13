@@ -1,21 +1,24 @@
-# ---------- Stage 1: build ----------
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
-
-COPY microblog-heads.csproj .
-RUN dotnet restore
-
-COPY . .
-# Don't use --no-restore: the restore above ran before the .razor files were copied,
-# so it skipped the package that provides _framework/blazor.web.js. Restoring again
-# here (cached, so fast) picks it up; without it no page in the container is interactive.
-RUN dotnet publish -c Release -o /app/publish
-
-# ---------- Stage 2: run ----------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
-COPY --from=build /app/publish .
+EXPOSE 8080
 
 ENV ASPNETCORE_URLS=http://+:8080
-EXPOSE 8080
+
+USER app
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG configuration=Release
+WORKDIR /src
+COPY ["microblog-heads.csproj", "./"]
+RUN dotnet restore "microblog-heads.csproj"
+COPY . .
+WORKDIR "/src/."
+RUN dotnet build "microblog-heads.csproj" -c $configuration -o /app/build
+
+FROM build AS publish
+ARG configuration=Release
+RUN dotnet publish "microblog-heads.csproj" -c $configuration -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "microblog-heads.dll"]
