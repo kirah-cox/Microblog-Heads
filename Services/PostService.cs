@@ -27,17 +27,26 @@ public class PostService
             .ToListAsync();
     }
 
-    public async Task<Post> CreatePostAsync(int userId, string content, int? communityId = null, IEnumerable<string>? mediaFileNames = null)
+    public async Task<Post> CreatePostAsync(int userId, string content, int? communityId = null, IEnumerable<string>? mediaFileNames = null, IEnumerable<string>? hashTags = null)
     {
         var files = mediaFileNames?.ToList() ?? new List<string>();
-        
+        var tagNames = NormalizeHashTags(hashTags);
+
         content = content?.Trim() ?? ""; // optional, we may wish to keep white space in later versions
-        if (content.Length == 0 && files.Count == 0) 
+        if (content.Length == 0 && files.Count == 0)
             throw new ArgumentException("A post cannot be empty");
-        if (content.Length > 500) 
+        if (content.Length > 500)
             throw new ArgumentException("A post cannot exceed 500 characters");
 
         await using var db = await _dbFactory.CreateDbContextAsync();
+
+        // Reuse hashtags that already exist; create the rest.
+        var existingTags = await db.HashTags
+            .Where(h => tagNames.Contains(h.Name.ToLower()))
+            .ToListAsync();
+        var tags = tagNames
+            .Select(name => existingTags.FirstOrDefault(h => h.Name.ToLower() == name) ?? new HashTag { Name = name })
+            .ToList();
 
         var post = new Post
         {
@@ -45,7 +54,8 @@ public class PostService
             Content = content,
             DatePosted = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), // column is "timestamp without time zone"; Npgsql rejects Kind=Utc
             CommunityId = communityId,
-            PostMedia = files.Select(f => new PostMedia { Media = new Media { Path = f } }).ToList()
+            PostMedia = files.Select(f => new PostMedia { Media = new Media { Path = f } }).ToList(),
+            PostHashTags = tags.Select(t => new PostHashTag { HashTag = t }).ToList()
         };
         try 
         {
@@ -57,6 +67,29 @@ public class PostService
             throw new InvalidOperationException("Could not save the post. Does user (or community) exist?", ex);
         }
         return post;
+    }
+
+    /// <summary>
+    /// Trims, drops a leading '#', lowercases, removes blanks and duplicates, and checks each
+    /// hashtag is 1-50 letters, digits or underscores.
+    /// </summary>
+    private static List<string> NormalizeHashTags(IEnumerable<string>? hashTags)
+    {
+        var names = (hashTags ?? Enumerable.Empty<string>())
+            .Select(t => (t ?? "").Trim().TrimStart('#').ToLowerInvariant())
+            .Where(t => t.Length > 0)
+            .Distinct()
+            .ToList();
+
+        foreach (var name in names)
+        {
+            if (name.Length > 50)
+                throw new ArgumentException($"Hashtag #{name} is longer than 50 characters");
+            if (!name.All(c => char.IsLetterOrDigit(c) || c == '_'))
+                throw new ArgumentException($"Hashtag #{name} can only contain letters, numbers and underscores");
+        }
+
+        return names;
     }
 
     public async Task<bool> ToggleLikePostAsync (int userId, int postId)

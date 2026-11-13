@@ -11,6 +11,23 @@
 
             @if (OriginalPostId is null)
             {
+                <div class="mt-2">
+                    @foreach (var tag in hashTags)
+                    {
+                        <div @key="tag" class="input-group input-group-sm mb-1">
+                            <span class="input-group-text">#</span>
+                            <input type="text" class="form-control" placeholder="hashtag" maxlength="50"
+                                   @bind="tag.Value" @bind:event="oninput" />
+                            <button type="button" class="btn btn-outline-secondary" title="Remove hashtag"
+                                    @onclick="() => RemoveHashTag(tag)">&times;</button>
+                        </div>
+                    }
+                    @if (hashTags.Count < MaxHashTags)
+                    {
+                        <button type="button" class="btn btn-link btn-sm p-0" @onclick="AddHashTag">+ Add another hashtag</button>
+                    }
+                </div>
+
                 <InputFile @key="inputKey" OnChange="OnFilesChosen" multiple
                            accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.webm"
                            class="form-control form-control-sm mt-2" />
@@ -52,6 +69,23 @@
     private List<IBrowserFile> files = new();
     private int inputKey;   // changing this key makes Blazor build a fresh, empty file picker
 
+    private const int MaxHashTags = 10;
+    private List<HashTagInput> hashTags = new() { new() };
+
+    // A class (not a plain string) so each box keeps its identity for @key when one is removed.
+    private class HashTagInput
+    {
+        public string Value { get; set; } = "";
+    }
+
+    private void AddHashTag() => hashTags.Add(new());
+
+    private void RemoveHashTag(HashTagInput tag)
+    {
+        hashTags.Remove(tag);
+        if (hashTags.Count == 0) hashTags.Add(new());   // always keep one empty box
+    }
+
     private void OnFilesChosen(InputFileChangeEventArgs e)
     {
         error = null;
@@ -84,10 +118,12 @@
             if (OriginalPostId is int original)
                 await PostService.CreateRepostAsync(me.Id, original, text, CommunityId);
             else
-                await PostService.CreatePostAsync(me.Id, text, CommunityId, saved);
+                await PostService.CreatePostAsync(me.Id, text, CommunityId, saved,
+                    hashTags.Select(t => t.Value));
 
             text = "";
             files = new();
+            hashTags = new() { new() };
             inputKey++;
             succeeded = true;
         }
