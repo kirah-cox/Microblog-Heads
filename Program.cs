@@ -4,6 +4,7 @@ using microblog_heads.Models;
 using microblog_heads.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 DotNetEnv.Env.Load();
 
@@ -33,6 +34,7 @@ builder.Services.AddScoped<CommunityService>();
 builder.Services.AddScoped<HashTagService>();
 builder.Services.AddScoped<DisplayService>();
 builder.Services.AddScoped<CurrentUserState>();
+builder.Services.AddSingleton<MediaService>();
 
 var app = builder.Build();
 
@@ -56,6 +58,13 @@ app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 
+var mediaFolder = Path.Combine(builder.Environment.ContentRootPath, "Media");
+Directory.CreateDirectory(mediaFolder);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(mediaFolder),
+    RequestPath = "/media"
+});
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

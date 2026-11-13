@@ -1,4 +1,5 @@
 @inject PostService PostService
+@inject MediaService MediaService
 @inject CurrentUserState CurrentUser
 
 @if (CurrentUser.User is { } me)
@@ -7,6 +8,23 @@
         <div class="card-body">
             <textarea class="form-control" rows="3" placeholder="@Placeholder"
                       @bind="text" @bind:event="oninput"></textarea>
+
+            @if (OriginalPostId is null)
+            {
+                <InputFile @key="inputKey" OnChange="OnFilesChosen" multiple
+                           accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.webm"
+                           class="form-control form-control-sm mt-2" />
+                @if (files.Count > 0)
+                {
+                    <ul class="small text-muted mb-0 mt-1">
+                        @foreach (var f in files)
+                        {
+                            <li>@f.Name (@(f.Size / 1024) KB)</li>
+                        }
+                    </ul>
+                }
+            }
+
             <div class="d-flex justify-content-between align-items-center mt-2">
                 <small class="@(text.Length > 500 ? "text-danger" : "text-muted")">@text.Length / 500</small>
                 <button type="button" class="btn btn-primary btn-sm" disabled="@isSaving" @onclick="SubmitAsync">
@@ -31,6 +49,21 @@
     private string text = "";
     private string? error;
     private bool isSaving;
+    private List<IBrowserFile> files = new();
+    private int inputKey;   // changing this key makes Blazor build a fresh, empty file picker
+
+    private void OnFilesChosen(InputFileChangeEventArgs e)
+    {
+        error = null;
+        var chosen = e.GetMultipleFiles(20);
+        if (chosen.Count > MediaService.MaxFilesPerPost)
+        {
+            error = $"You can attach up to {MediaService.MaxFilesPerPost} files.";
+            files = new();
+            return;
+        }
+        files = chosen.ToList();
+    }
 
     private async Task SubmitAsync()
     {
@@ -38,23 +71,36 @@
 
         error = null;
         isSaving = true;
+        var saved = new List<string>();
+        var succeeded = false;
         try
         {
+            foreach (var f in files)
+            {
+                await using var stream = f.OpenReadStream(MediaService.MaxVideoBytes);
+                saved.Add(await MediaService.SaveFileAsync(stream, f.Name, f.Size));
+            }
+
             if (OriginalPostId is int original)
                 await PostService.CreateRepostAsync(me.Id, original, text, CommunityId);
             else
-                await PostService.CreatePostAsync(me.Id, text, CommunityId);
+                await PostService.CreatePostAsync(me.Id, text, CommunityId, saved);
 
             text = "";
-            await OnPosted.InvokeAsync();
+            files = new();
+            inputKey++;
+            succeeded = true;
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException)
         {
+            foreach (var name in saved) MediaService.DeleteFile(name);   // don't leave orphans
             error = ex.Message;
         }
         finally
         {
             isSaving = false;
         }
+
+        if (succeeded) await OnPosted.InvokeAsync();
     }
 }
