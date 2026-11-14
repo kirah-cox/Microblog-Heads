@@ -23,6 +23,8 @@ public partial class Post
 
     public virtual ICollection<Post> InverseParentPost { get; set; } = new List<Post>();
 
+    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+
     public virtual Post? ParentPost { get; set; }
 
     public virtual ICollection<PostFollow> PostFollows { get; set; } = new List<PostFollow>();

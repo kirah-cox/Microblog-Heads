@@ -24,6 +24,9 @@ public class DisplayService
                 .ThenInclude(pp => pp!.RegularUser)
             .Include(x => x.ParentPost)
                 .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -49,6 +52,9 @@ public class DisplayService
                 .ThenInclude(pp => pp!.RegularUser)
             .Include(x => x.ParentPost)
                 .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -74,6 +80,9 @@ public class DisplayService
                 .ThenInclude(pp => pp!.RegularUser)
             .Include(x => x.ParentPost)
                 .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -103,6 +112,9 @@ public class DisplayService
                 .ThenInclude(pp => pp!.RegularUser)
             .Include(x => x.ParentPost)
                 .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -134,6 +146,9 @@ public class DisplayService
                 .ThenInclude(pp => pp!.RegularUser)
             .Include(x => x.ParentPost)
                 .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -166,6 +181,9 @@ public class DisplayService
                 .ThenInclude(pp => pp!.RegularUser)
             .Include(x => x.ParentPost)
                 .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -201,6 +219,9 @@ public class DisplayService
                 .ThenInclude(pp => pp!.RegularUser)
             .Include(x => x.ParentPost)
                 .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -248,6 +269,9 @@ public class DisplayService
                 .ThenInclude(pp => pp!.RegularUser)
             .Include(x => x.ParentPost)
                 .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
             .Include(x => x.PostFollows)
             .Include(x => x.PostHashTags)
                 .ThenInclude(pht => pht.HashTag)
@@ -264,6 +288,44 @@ public class DisplayService
         // row per post per hashtag/comment/like, and a random SQL order splits those rows up,
         // which makes EF return the same post more than once.
         return posts.OrderBy(_ => Random.Shared.Next()).ToList();
+    }
+
+    /// <summary>
+    /// One post, loaded like the feeds load posts (for the post page). Returns null if the post
+    /// doesn't exist or its author and the viewer have blocked each other.
+    /// </summary>
+    public async Task<Post?> GetPostByIdAsync(int postID, int viewerID)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var blockedIds = await GetBlockedUserIdsAsync(db, viewerID);
+
+        var post = await db.Posts
+            .Where(x => x.Id == postID)
+            .Where(x => !blockedIds.Contains(x.RegularUserId))
+            .Include(x => x.RegularUser)
+            .Include(x => x.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.RegularUser)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.Community)
+            .Include(x => x.ParentPost)
+                .ThenInclude(pp => pp!.PostMedia)
+                    .ThenInclude(pm => pm.Media)
+            .Include(x => x.PostFollows)
+            .Include(x => x.PostHashTags)
+                .ThenInclude(pht => pht.HashTag)
+            .Include(x => x.Comments)
+                .ThenInclude(c => c.RegularUser)
+            .Include(x => x.PostMedia)
+                .ThenInclude(pm => pm.Media)
+            .FirstOrDefaultAsync();
+
+        if (post is null) return null;
+
+        var posts = new List<Post> { post };
+        RemoveBlockedComments(posts, blockedIds);
+        await FillLikeCountsAsync(db, posts);
+        return post;
     }
 
     private static async Task<List<int>> GetBlockedUserIdsAsync(AppDbContext db, int userID)

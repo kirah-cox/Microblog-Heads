@@ -393,6 +393,61 @@ namespace microblog_heads.Migrations
                     b.ToTable("media", "Microblog");
                 });
 
+            modelBuilder.Entity("microblog_heads.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CommentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("comment_id");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("date_created");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_read");
+
+                    b.Property<int>("NotifiedUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("notified_user_id");
+
+                    b.Property<int>("NotifierUserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("notifier_user_id");
+
+                    b.Property<int?>("PostId")
+                        .HasColumnType("integer")
+                        .HasColumnName("post_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("notification_pkey");
+
+                    b.HasIndex("CommentId");
+
+                    b.HasIndex("NotifierUserId");
+
+                    b.HasIndex("PostId");
+
+                    b.HasIndex(new[] { "NotifiedUserId", "IsRead" }, "ix_notification_notified_is_read");
+
+                    b.ToTable("notification", "Microblog");
+                });
+
             modelBuilder.Entity("microblog_heads.Models.Post", b =>
                 {
                     b.Property<int>("Id")
@@ -874,6 +929,43 @@ namespace microblog_heads.Migrations
                     b.Navigation("RegularUser");
                 });
 
+            modelBuilder.Entity("microblog_heads.Models.Notification", b =>
+                {
+                    b.HasOne("microblog_heads.Models.Comment", "Comment")
+                        .WithMany("Notifications")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_notification_comment");
+
+                    b.HasOne("microblog_heads.Models.RegularUser", "NotifiedUser")
+                        .WithMany("NotificationNotifiedUsers")
+                        .HasForeignKey("NotifiedUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_notified");
+
+                    b.HasOne("microblog_heads.Models.RegularUser", "NotifierUser")
+                        .WithMany("NotificationNotifierUsers")
+                        .HasForeignKey("NotifierUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_notifier");
+
+                    b.HasOne("microblog_heads.Models.Post", "Post")
+                        .WithMany("Notifications")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_notification_post");
+
+                    b.Navigation("Comment");
+
+                    b.Navigation("NotifiedUser");
+
+                    b.Navigation("NotifierUser");
+
+                    b.Navigation("Post");
+                });
+
             modelBuilder.Entity("microblog_heads.Models.Post", b =>
                 {
                     b.HasOne("microblog_heads.Models.Community", "Community")
@@ -1026,6 +1118,8 @@ namespace microblog_heads.Migrations
                     b.Navigation("CommentMissuses");
 
                     b.Navigation("InverseCommentNavigation");
+
+                    b.Navigation("Notifications");
                 });
 
             modelBuilder.Entity("microblog_heads.Models.Community", b =>
@@ -1062,6 +1156,8 @@ namespace microblog_heads.Migrations
 
                     b.Navigation("InverseParentPost");
 
+                    b.Navigation("Notifications");
+
                     b.Navigation("PostFollows");
 
                     b.Navigation("PostHashTags");
@@ -1094,6 +1190,10 @@ namespace microblog_heads.Migrations
                     b.Navigation("FollowerRegularUserFollowings");
 
                     b.Navigation("HashTagFollows");
+
+                    b.Navigation("NotificationNotifiedUsers");
+
+                    b.Navigation("NotificationNotifierUsers");
 
                     b.Navigation("PostFollows");
 

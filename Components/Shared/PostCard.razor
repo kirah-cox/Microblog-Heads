@@ -6,7 +6,7 @@
 @* Displays one post: author, date, content, hashtags, like count, an expandable
    comment thread, a repost box and a Follow post toggle. Expects the post to be loaded the way
    DisplayService loads posts (RegularUser, Community, ParentPost.RegularUser, ParentPost.Community,
-   PostFollows, PostHashTags.HashTag and Comments.RegularUser included; LikeCount set on
+   ParentPost.PostMedia.Media, PostMedia.Media, PostFollows, PostHashTags.HashTag and Comments.RegularUser included; LikeCount set on
    the post and its comments). *@
 
 <article class="card post mb-3">
@@ -68,6 +68,15 @@
                     </div>
                 </div>
                 <p class="post-content mb-0">@original.Content</p>
+                @if (original.PostMedia.Count > 0)
+                {
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        @foreach (var pm in original.PostMedia)
+                        {
+                            <img src="/media/@pm.Media.Path" alt="Reposted post attachment" class="post-media" loading="lazy" />
+                        }
+                    </div>
+                }
             </div>
         }
         else if (Post.ParentPostId is not null)
@@ -116,6 +125,15 @@
                 @RepostIcon <span class="action-label">Repost</span>
             </button>
 
+            @if (IsOwnPost)
+            {
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none action delete-btn"
+                        title="Delete this post" disabled="@isDeleting"
+                        @onclick="StartDelete">
+                    @TrashIcon <span class="action-label">Delete</span>
+                </button>
+            }
+
             @if (CurrentUser.IsLoggedIn)
             {
                 @* Followed posts show up on the Following page. *@
@@ -129,6 +147,23 @@
                 </button>
             }
         </div>
+
+        @if (confirmingDelete)
+        {
+            <div class="delete-confirm mt-3" role="alert">
+                <span>Delete this post? Its comments and likes will be deleted too. This can't be undone.</span>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@isDeleting" @onclick="CancelDelete">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-sm" disabled="@isDeleting" @onclick="DeleteAsync">
+                        @(isDeleting ? "Deleting..." : "Delete")
+                    </button>
+                </div>
+            </div>
+            @if (deleteError is not null)
+            {
+                <div class="text-danger small mt-1">@deleteError</div>
+            }
+        }
 
         @if (showRepost)
         {
@@ -162,7 +197,9 @@
             <ul class="list-unstyled comments mt-3 mb-0">
                 @foreach (var row in OrderedComments(Post))
                 {
-                    <li class="comment @(row.Depth > 0 ? "reply" : "")" style="margin-left: @(Math.Min(row.Depth, 4) * 1.25)rem">
+                    <li id="comment-@row.Comment.Id"
+                        class="comment @(row.Depth > 0 ? "reply" : "") @(row.Comment.Id == HighlightCommentId ? "highlight" : "")"
+                        style="margin-left: @(Math.Min(row.Depth, 4) * 1.25)rem">
                         <a href="profile/@row.Comment.RegularUser.Username" class="fw-semibold text-decoration-none">@@@row.Comment.RegularUser.Username</a>
                         <span class="small text-muted ms-1">@FormatDate(row.Comment.DatePosted)</span>
                         <div>@row.Comment.Content</div>
@@ -351,8 +388,34 @@
     /// <summary>Raised when the author is followed (true) or unfollowed (false) from this card.</summary>
     [Parameter] public EventCallback<bool> OnFollowToggled { get; set; }
 
+    /// <summary>Open the comment thread when the card first shows (used by the post page).</summary>
+    [Parameter] public bool ShowCommentsInitially { get; set; }
+
+    /// <summary>
+    /// A comment to highlight (from a notification). Opens the comments, expands the replies
+    /// above it so it's visible, and gives it id="comment-{id}" so the page can scroll to it.
+    /// </summary>
+    [Parameter] public int? HighlightCommentId { get; set; }
+
     private bool showComments;
     private bool showRepost;
+
+    protected override void OnInitialized()
+    {
+        showComments = ShowCommentsInitially || HighlightCommentId is not null;
+
+        // Walk up from the highlighted comment, expanding each parent's replies.
+        if (HighlightCommentId is int highlightId)
+        {
+            var byId = Post.Comments.ToDictionary(c => c.Id);
+            var current = byId.GetValueOrDefault(highlightId);
+            while (current?.ParentCommentId is int parentId && byId.TryGetValue(parentId, out var parent))
+            {
+                expandedReplies.Add(parentId);
+                current = parent;
+            }
+        }
+    }
 
     // Writing comments and replies. One text field is shared, because only one box is open at a time.
     private string commentText = "";
@@ -480,4 +543,70 @@
             <path d="m17 1 4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><path d="m7 23-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
         </svg>
     };
+
+    private static readonly RenderFragment TrashIcon = __builder =>
+    {
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" />
+        </svg>
+    };
+
+    // ---------- Deleting your own post ----------
+
+    /// <summary>Raised after this post is deleted. List pages call RemoveDeleted(posts, post.Id).</summary>
+    [Parameter] public EventCallback OnDeleted { get; set; }
+
+    private bool confirmingDelete;
+    private bool isDeleting;
+    private string? deleteError;
+
+    private bool IsOwnPost => CurrentUser.User is { } me && me.Id == Post.RegularUserId;
+
+    private void StartDelete()
+    {
+        confirmingDelete = true;
+        deleteError = null;
+    }
+
+    private void CancelDelete()
+    {
+        confirmingDelete = false;
+        deleteError = null;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (CurrentUser.User is not { } me) return;
+
+        isDeleting = true;
+        deleteError = null;
+        try
+        {
+            await PostService.DeletePostAsync(me.Id, Post.Id);
+            confirmingDelete = false;
+            await OnDeleted.InvokeAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            deleteError = ex.Message;
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    /// <summary>
+    /// Updates a page's list after a delete: drops the deleted post, and turns reposts of it
+    /// into standalone posts (matching what the database did to them).
+    /// </summary>
+    public static void RemoveDeleted(List<Post> posts, int deletedId)
+    {
+        posts.RemoveAll(p => p.Id == deletedId);
+        foreach (var p in posts.Where(p => p.ParentPostId == deletedId))
+        {
+            p.ParentPostId = null;
+            p.ParentPost = null;
+        }
+    }
 }

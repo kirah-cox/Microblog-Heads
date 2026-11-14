@@ -1,0 +1,147 @@
+.bell-wrap {
+    position: relative;
+}
+
+.bell-btn {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--mb-muted);
+}
+
+    .bell-btn svg {
+        width: 22px;
+        height: 22px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .bell-btn:hover,
+    .bell-btn.open {
+        background-color: var(--mb-accent-soft);
+        color: var(--mb-accent-hover);
+    }
+
+    .bell-btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--mb-accent-ring);
+    }
+
+.bell-badge {
+    position: absolute;
+    top: 3px;
+    right: 1px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background-color: var(--mb-danger);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    border: 2px solid var(--mb-surface);
+    box-sizing: content-box;
+}
+
+.bell-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+}
+
+.bell-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 21;
+    width: min(360px, calc(100vw - 2rem));
+    max-height: min(480px, 70vh);
+    display: flex;
+    flex-direction: column;
+    background-color: var(--mb-surface);
+    border: 1px solid var(--mb-border);
+    border-radius: var(--mb-radius);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+    overflow: hidden;
+}
+
+.bell-panel-header {
+    padding: 0.8rem 1rem;
+    font-weight: 700;
+    border-bottom: 1px solid var(--mb-border);
+}
+
+.bell-empty {
+    padding: 1.5rem 1rem;
+    color: var(--mb-muted);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.bell-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+}
+
+    .bell-list li + li {
+        border-top: 1px solid var(--mb-border);
+    }
+
+.bell-item {
+    display: flex;
+    gap: 0.7rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--mb-text);
+    font-size: 0.9rem;
+    text-align: left;
+}
+
+    .bell-item:hover {
+        background-color: var(--mb-canvas);
+    }
+
+    .bell-item.unread {
+        background-color: var(--mb-accent-soft);
+    }
+
+.bell-item-text {
+    min-width: 0;
+    line-height: 1.35;
+}
+
+.bell-preview {
+    margin-top: 0.15rem;
+    color: var(--mb-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bell-time {
+    margin-top: 0.15rem;
+    color: var(--mb-muted);
+    font-size: 0.78rem;
+}
+
+/* Desktop: the bell sits at the top of the sidebar, so open the panel out over the page. */
+@media (min-width: 641px) {
+    .bell-panel {
+        right: auto;
+        left: 0;
+    }
+}

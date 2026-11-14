@@ -40,6 +40,10 @@ public partial class RegularUser
 
     public virtual ICollection<HashTagFollow> HashTagFollows { get; set; } = new List<HashTagFollow>();
 
+    public virtual ICollection<Notification> NotificationNotifiedUsers { get; set; } = new List<Notification>();
+
+    public virtual ICollection<Notification> NotificationNotifierUsers { get; set; } = new List<Notification>();
+
     public virtual ICollection<PostFollow> PostFollows { get; set; } = new List<PostFollow>();
 
     public virtual ICollection<PostLike> PostLikes { get; set; } = new List<PostLike>();

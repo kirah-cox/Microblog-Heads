@@ -1,0 +1,160 @@
+@page "/post/{PostId:int}"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject DisplayService DisplayService
+@inject UserService UserService
+@inject CurrentUserState CurrentUser
+@inject PostService PostService
+@inject CommentService CommentService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@* One post with its comments open. Notifications link here; "?comment=12" highlights and
+   scrolls to that comment. Logged-out users are sent to /login. *@
+
+<PageTitle>Post</PageTitle>
+
+<div class="feed mx-auto">
+    @if (!CurrentUser.IsInitialized || !CurrentUser.IsLoggedIn || isLoading)
+    {
+        <div class="d-flex justify-content-center mt-5">
+            <div class="spinner-border text-secondary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    else if (post is null)
+    {
+        <div class="text-muted text-center py-5 border rounded bg-light">
+            This post doesn't exist or isn't available.
+        </div>
+    }
+    else
+    {
+        var authorId = post.RegularUserId;
+        <PostCard Post="post" @key="cardKey" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds"
+                  IsFollowingAuthor="followingIds.Contains(authorId)"
+                  OnFollowToggled="following => SetFollowing(authorId, following)"
+                  ShowCommentsInitially="true" HighlightCommentId="CommentId"
+                  OnDeleted="@(() => Navigation.NavigateTo("profile"))" />
+    }
+</div>
+
+@code {
+    [Parameter] public int PostId { get; set; }
+
+    /// <summary>Comment to highlight, from the URL: post/5?comment=12.</summary>
+    [SupplyParameterFromQuery(Name = "comment")] public int? CommentId { get; set; }
+
+    private Post? post;
+    private readonly HashSet<int> followingIds = new();
+    private readonly HashSet<int> likedPostIds = new();
+    private readonly HashSet<int> likedCommentIds = new();
+    private bool isLoading;
+    private string? errorMessage;
+    private bool scrollPending;
+    private (int, int?) loadedFor = (0, null);
+
+    // Rebuild the card (resetting which comments are open) when the post or comment changes.
+    private string cardKey => $"{PostId}-{CommentId}";
+
+    protected override void OnInitialized()
+    {
+        CurrentUser.Changed += OnCurrentUserChanged;
+    }
+
+    // Also runs when a notification links to a different post while this page is already open.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (CurrentUser.IsInitialized && loadedFor != (PostId, CommentId))
+        {
+            await LoadAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !CurrentUser.IsInitialized)
+        {
+            await CurrentUser.InitializeAsync();
+        }
+
+        if (scrollPending && post is not null && !isLoading)
+        {
+            scrollPending = false;
+            try
+            {
+                await JS.InvokeVoidAsync("scrollToElementId", $"comment-{CommentId}");
+            }
+            catch (JSException)
+            {
+                // Scrolling is a nicety; the comment is still highlighted.
+            }
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        errorMessage = null;
+        loadedFor = (PostId, CommentId);
+
+        if (CurrentUser.User is not { } user)
+        {
+            post = null;
+            Navigation.NavigateTo("login", replace: true);
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            post = await DisplayService.GetPostByIdAsync(PostId, user.Id);
+            if (post is not null)
+            {
+                await LoadFollowingAndLikesAsync(user.Id);
+                scrollPending = CommentId is not null;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Couldn't load this post: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadFollowingAndLikesAsync(int myId)
+    {
+        var following = await UserService.GetFollowingAsync(myId);
+        followingIds.Clear();
+        followingIds.UnionWith(following.Select(u => u.Id));
+
+        likedPostIds.Clear();
+        likedPostIds.UnionWith(await PostService.GetLikedPostIdsByUserIdAsync(myId));
+        likedCommentIds.Clear();
+        likedCommentIds.UnionWith(await CommentService.GetLikedCommentIdsByUserIdAsync(myId));
+    }
+
+    private void SetFollowing(int authorId, bool following)
+    {
+        if (following) followingIds.Add(authorId);
+        else followingIds.Remove(authorId);
+    }
+
+    private void OnCurrentUserChanged() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        CurrentUser.Changed -= OnCurrentUserChanged;
+    }
+}

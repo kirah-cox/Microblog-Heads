@@ -10,6 +10,12 @@
         <span class="brand-mark" aria-hidden="true">mh</span>
         <span class="brand-name">Microblog Heads</span>
     </a>
+    @if (CurrentUser.IsInitialized && CurrentUser.IsLoggedIn)
+    {
+        <div class="brand-bell">
+            <NotificationBell />
+        </div>
+    }
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />

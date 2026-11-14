@@ -33,6 +33,12 @@
     letter-spacing: -0.01em;
 }
 
+/* Notification bell: right end of the brand row, left of the phone menu toggle. */
+.brand-bell {
+    margin-left: auto;
+    margin-right: 3.5rem;
+}
+
 /* ---------- Menu toggle (phones only) ---------- */
 .navbar-toggler {
     appearance: none;
@@ -180,6 +186,11 @@
 @media (min-width: 641px) {
     .brand-row {
         height: 4.5rem;
+        padding-right: 0.75rem;
+    }
+
+    .brand-bell {
+        margin-right: 0; /* no menu toggle on desktop */
     }
 
     .navbar-toggler {

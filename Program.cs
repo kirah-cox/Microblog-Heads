@@ -27,6 +27,8 @@ var connStr = $"Host={Environment.GetEnvironmentVariable("DB_HOST")};" +
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseNpgsql(connStr));
 
+builder.Services.AddSingleton<NotificationNotifier>();
+builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<CommentService>();

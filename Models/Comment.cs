@@ -25,6 +25,8 @@ public partial class Comment
 
     public virtual ICollection<Comment> InverseCommentNavigation { get; set; } = new List<Comment>();
 
+    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+
     public virtual Post Post { get; set; } = null!;
 
     public virtual RegularUser RegularUser { get; set; } = null!;

@@ -145,7 +145,8 @@ else
         {
             @foreach (var post in posts)
             {
-                <PostCard Post="post" @key="post.Id" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds" IsFollowingAuthor="IsFollowingProfileUser" OnFollowToggled="SetFollowingProfileUser" />
+                <PostCard Post="post" @key="post.Id" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds" IsFollowingAuthor="IsFollowingProfileUser" OnFollowToggled="SetFollowingProfileUser"
+                          OnDeleted="() => PostCard.RemoveDeleted(posts, post.Id)" />
             }
         }
     </div>

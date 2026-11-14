@@ -7,10 +7,52 @@ namespace microblog_heads.Services;
 public class PostService
 {
     private readonly IDbContextFactory<AppDbContext> _dbFactory;
+    private readonly NotificationService _notifications;
+    private readonly MediaService _media;
 
-    public PostService(IDbContextFactory<AppDbContext> dbFactory)
+    public PostService(IDbContextFactory<AppDbContext> dbFactory, NotificationService notifications, MediaService media)
     {
         _dbFactory = dbFactory;
+        _notifications = notifications;
+        _media = media;
+    }
+
+    /// <summary>
+    /// Deletes one of the user's own posts. The database's cascade deletes remove its comments,
+    /// likes, follows, hashtag links, reports and notifications; this also deletes its pictures
+    /// (rows and files). Reposts of it are kept (every post has its own text) and become
+    /// standalone posts, because fk_post_parent sets their parent_post_id to null.
+    /// </summary>
+    public async Task DeletePostAsync(int userId, int postId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var post = await db.Posts
+            .Include(p => p.PostMedia)
+                .ThenInclude(pm => pm.Media)
+            .FirstOrDefaultAsync(p => p.Id == postId);
+        if (post is null)
+            throw new InvalidOperationException("That post no longer exists.");
+        if (post.RegularUserId != userId)
+            throw new InvalidOperationException("You can only delete your own posts.");
+
+        var media = post.PostMedia.Select(pm => pm.Media).ToList();
+
+        await _notifications.NotifyForDeletedPostAsync(db, post.Id);
+        db.Media.RemoveRange(media);
+        db.Posts.Remove(post);
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new InvalidOperationException("Could not delete the post.", ex);
+        }
+
+        // Only remove the files once the rows are gone, so a failed delete leaves the post intact.
+        foreach (var m in media) _media.DeleteFile(m.Path);
     }
 
     public async Task<Post?> GetPostByIdAsync(int postId)
@@ -60,7 +102,9 @@ public class PostService
         try 
         {
             db.Posts.Add(post);
-            await db.SaveChangesAsync();    
+            // New hashtags have no followers yet, so only existing ones matter.
+            await _notifications.AddForNewPostAsync(db, post, existingTags.Select(t => t.Id));
+            await db.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
         {
@@ -100,6 +144,7 @@ public class PostService
         if (existing is not null)
         {
             db.PostLikes.Remove(existing);
+            await _notifications.RemoveForPostUnlikeAsync(db, userId, postId);
             await db.SaveChangesAsync();
 
             return false; // if a like exists, we are 'unliking'the post
@@ -112,6 +157,7 @@ public class PostService
         };
 
         db.PostLikes.Add(like);
+        await _notifications.AddForPostLikeAsync(db, userId, postId);
 
         await db.SaveChangesAsync();
 
@@ -173,7 +219,8 @@ public class PostService
         try 
         {
             db.Posts.Add(post);
-            await db.SaveChangesAsync();    
+            await _notifications.AddForNewPostAsync(db, post);
+            await db.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
         {

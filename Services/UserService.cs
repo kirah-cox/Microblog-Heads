@@ -10,10 +10,12 @@ public class UserService
     private const string UniqueEmailIndex = "uq_regular_user_email_ci";
 
     private readonly IDbContextFactory<AppDbContext> _dbFactory;
+    private readonly NotificationService _notifications;
 
-    public UserService(IDbContextFactory<AppDbContext> dbFactory)
+    public UserService(IDbContextFactory<AppDbContext> dbFactory, NotificationService notifications)
     {
         _dbFactory = dbFactory;
+        _notifications = notifications;
     }
 
     public async Task<RegularUser?> GetUserByIdAsync(int userId)
@@ -112,6 +114,7 @@ public class UserService
         try
         {
             db.Followers.Add(newFollower);
+            await _notifications.AddForFollowAsync(db, followerId, followingId);
             await db.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
@@ -134,6 +137,7 @@ public class UserService
         try
         {
             db.Followers.Remove(follower);
+            await _notifications.RemoveForUnfollowAsync(db, followerId, followingId);
             await db.SaveChangesAsync();
         }
         catch (DbUpdateException ex)

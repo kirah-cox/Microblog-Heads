@@ -52,7 +52,8 @@
             var authorId = post.RegularUserId;
             <PostCard Post="post" @key="post.Id" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds"
                       IsFollowingAuthor="followingIds.Contains(authorId)"
-                      OnFollowToggled="following => SetFollowing(authorId, following)" />
+                      OnFollowToggled="following => SetFollowing(authorId, following)"
+                      OnDeleted="() => PostCard.RemoveDeleted(posts, post.Id)" />
         }
     }
 </div>

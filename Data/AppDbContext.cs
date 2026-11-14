@@ -35,6 +35,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<Media> Media { get; set; }
 
+    public virtual DbSet<Notification> Notifications { get; set; }
+
     public virtual DbSet<Post> Posts { get; set; }
 
     public virtual DbSet<PostFollow> PostFollows { get; set; }
@@ -308,6 +310,46 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Path)
                 .HasMaxLength(500)
                 .HasColumnName("path");
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("notification_pkey");
+
+            entity.ToTable("notification", "Microblog");
+
+            entity.HasIndex(e => new { e.NotifiedUserId, e.IsRead }, "ix_notification_notified_is_read");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CommentId).HasColumnName("comment_id");
+            entity.Property(e => e.DateCreated).HasColumnName("date_created").HasColumnType("timestamp without time zone");
+            entity.Property(e => e.IsRead)
+                .HasDefaultValue(false)
+                .HasColumnName("is_read");
+            entity.Property(e => e.NotifiedUserId).HasColumnName("notified_user_id");
+            entity.Property(e => e.NotifierUserId).HasColumnName("notifier_user_id");
+            entity.Property(e => e.PostId).HasColumnName("post_id");
+            entity.Property(e => e.Type)
+                .HasMaxLength(30)
+                .HasColumnName("type");
+
+            entity.HasOne(d => d.Comment).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.CommentId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_notification_comment");
+
+            entity.HasOne(d => d.NotifiedUser).WithMany(p => p.NotificationNotifiedUsers)
+                .HasForeignKey(d => d.NotifiedUserId)
+                .HasConstraintName("fk_notification_notified");
+
+            entity.HasOne(d => d.NotifierUser).WithMany(p => p.NotificationNotifierUsers)
+                .HasForeignKey(d => d.NotifierUserId)
+                .HasConstraintName("fk_notification_notifier");
+
+            entity.HasOne(d => d.Post).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.PostId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_notification_post");
         });
 
         modelBuilder.Entity<Post>(entity =>
