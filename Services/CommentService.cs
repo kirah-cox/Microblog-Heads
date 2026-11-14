@@ -7,10 +7,12 @@ namespace microblog_heads.Services;
 public class CommentService
 {
     private readonly IDbContextFactory<AppDbContext> _dbFactory;
+    private readonly NotificationService _notifications;
 
-    public CommentService(IDbContextFactory<AppDbContext> dbFactory)
+    public CommentService(IDbContextFactory<AppDbContext> dbFactory, NotificationService notifications)
     {
         _dbFactory = dbFactory;
+        _notifications = notifications;
     }
 
     public async Task<Comment?> GetCommentByIdAsync(int commentId)
@@ -49,7 +51,8 @@ public class CommentService
         try 
         {
             db.Comments.Add(comment);
-            await db.SaveChangesAsync();    
+            await _notifications.AddForNewCommentAsync(db, comment);
+            await db.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
         {
@@ -66,6 +69,7 @@ public class CommentService
         if (existing is not null)
         {
             db.CommentLikes.Remove(existing);
+            await _notifications.RemoveForCommentUnlikeAsync(db, userId, commentId);
             await db.SaveChangesAsync();
 
             return false; // if a like exists, we are 'unliking'the post
@@ -78,6 +82,7 @@ public class CommentService
         };
 
         db.CommentLikes.Add(like);
+        await _notifications.AddForCommentLikeAsync(db, userId, commentId);
 
         await db.SaveChangesAsync();
 

@@ -11,6 +11,7 @@ public partial class AppDbContext : DbContext
         : base(options)
     {
     }
+    public virtual DbSet<CommunityJoinRequest> CommunityJoinRequests { get; set; }
 
     public virtual DbSet<BlockedUser> BlockedUsers { get; set; }
 
@@ -34,6 +35,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<Media> Media { get; set; }
 
+    public virtual DbSet<Notification> Notifications { get; set; }
+
     public virtual DbSet<Post> Posts { get; set; }
 
     public virtual DbSet<PostFollow> PostFollows { get; set; }
@@ -52,6 +55,29 @@ public partial class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<CommunityJoinRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("community_join_request_pkey");
+
+            entity.ToTable("community_join_request", "Microblog");
+
+            entity.HasIndex(e => new { e.CommunityId, e.RegularUserId }, "uq_join_request").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CommunityId).HasColumnName("community_id");
+            entity.Property(e => e.RegularUserId).HasColumnName("regular_user_id");
+            entity.Property(e => e.DateRequested)
+                .HasColumnName("date_requested")
+                .HasColumnType("timestamp without time zone");
+
+            entity.HasOne(d => d.Community).WithMany(p => p.CommunityJoinRequests)
+                .HasForeignKey(d => d.CommunityId)
+                .HasConstraintName("fk_join_request_community");
+
+            entity.HasOne(d => d.RegularUser).WithMany(p => p.CommunityJoinRequests)
+                .HasForeignKey(d => d.RegularUserId)
+                .HasConstraintName("fk_join_request_user");
+        });
         modelBuilder.Entity<BlockedUser>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("blocked_users_pkey");
@@ -169,6 +195,9 @@ public partial class AppDbContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("name");
             entity.Property(e => e.ParentCommunityId).HasColumnName("parent_community_id");
+            entity.Property(e => e.IsPrivate)
+                .HasDefaultValue(false)
+                .HasColumnName("is_private");
 
             entity.HasOne(d => d.ParentCommunity).WithMany(p => p.InverseParentCommunity)
                 .HasForeignKey(d => d.ParentCommunityId)
@@ -281,6 +310,46 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Path)
                 .HasMaxLength(500)
                 .HasColumnName("path");
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("notification_pkey");
+
+            entity.ToTable("notification", "Microblog");
+
+            entity.HasIndex(e => new { e.NotifiedUserId, e.IsRead }, "ix_notification_notified_is_read");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CommentId).HasColumnName("comment_id");
+            entity.Property(e => e.DateCreated).HasColumnName("date_created").HasColumnType("timestamp without time zone");
+            entity.Property(e => e.IsRead)
+                .HasDefaultValue(false)
+                .HasColumnName("is_read");
+            entity.Property(e => e.NotifiedUserId).HasColumnName("notified_user_id");
+            entity.Property(e => e.NotifierUserId).HasColumnName("notifier_user_id");
+            entity.Property(e => e.PostId).HasColumnName("post_id");
+            entity.Property(e => e.Type)
+                .HasMaxLength(30)
+                .HasColumnName("type");
+
+            entity.HasOne(d => d.Comment).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.CommentId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_notification_comment");
+
+            entity.HasOne(d => d.NotifiedUser).WithMany(p => p.NotificationNotifiedUsers)
+                .HasForeignKey(d => d.NotifiedUserId)
+                .HasConstraintName("fk_notification_notified");
+
+            entity.HasOne(d => d.NotifierUser).WithMany(p => p.NotificationNotifierUsers)
+                .HasForeignKey(d => d.NotifierUserId)
+                .HasConstraintName("fk_notification_notifier");
+
+            entity.HasOne(d => d.Post).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.PostId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_notification_post");
         });
 
         modelBuilder.Entity<Post>(entity =>

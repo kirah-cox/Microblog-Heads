@@ -10,4 +10,7 @@ services:
       - .env
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      # Uploaded pictures are saved straight into the repo's Media folder so they can be committed.
+      - ./Media:/app/Media
     restart: unless-stopped

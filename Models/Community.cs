@@ -13,6 +13,10 @@ public partial class Community
 
     public int? ParentCommunityId { get; set; }
 
+    public bool IsPrivate { get; set; }
+
+    public virtual ICollection<CommunityJoinRequest> CommunityJoinRequests { get; set; } = new List<CommunityJoinRequest>();
+
     public virtual ICollection<CommunityUserRole> CommunityUserRoles { get; set; } = new List<CommunityUserRole>();
 
     public virtual ICollection<Community> InverseParentCommunity { get; set; } = new List<Community>();

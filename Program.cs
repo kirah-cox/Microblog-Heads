@@ -4,6 +4,7 @@ using microblog_heads.Models;
 using microblog_heads.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 DotNetEnv.Env.Load();
 
@@ -26,6 +27,8 @@ var connStr = $"Host={Environment.GetEnvironmentVariable("DB_HOST")};" +
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseNpgsql(connStr));
 
+builder.Services.AddSingleton<NotificationNotifier>();
+builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<PostService>();
 builder.Services.AddScoped<CommentService>();
@@ -33,6 +36,7 @@ builder.Services.AddScoped<CommunityService>();
 builder.Services.AddScoped<HashTagService>();
 builder.Services.AddScoped<DisplayService>();
 builder.Services.AddScoped<CurrentUserState>();
+builder.Services.AddSingleton<MediaService>();
 builder.Services.AddScoped<DarkModeService>();
 
 var app = builder.Build();
@@ -57,6 +61,13 @@ app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 
+var mediaFolder = Path.Combine(builder.Environment.ContentRootPath, "Media");
+Directory.CreateDirectory(mediaFolder);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(mediaFolder),
+    RequestPath = "/media"
+});
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

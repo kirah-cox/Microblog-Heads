@@ -1,0 +1,192 @@
+@implements IDisposable
+@inject CurrentUserState CurrentUser
+@inject NotificationService Notifications
+@inject NotificationNotifier Notifier
+@inject NavigationManager Navigation
+
+@* Bell with the signed-in user's unread count. Clicking it opens a panel with their newest
+   notifications and marks them all read (the ones that were unread stay highlighted while open).
+   The count updates live through NotificationNotifier. *@
+
+@if (CurrentUser.User is not null)
+{
+    <div class="bell-wrap">
+        <button type="button" class="bell-btn @(isOpen ? "open" : "")" @onclick="ToggleAsync"
+                title="Notifications" aria-label="@AriaLabel" aria-expanded="@isOpen">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+            @if (unreadCount > 0)
+            {
+                <span class="bell-badge">@(unreadCount > 99 ? "99+" : unreadCount.ToString())</span>
+            }
+        </button>
+
+        @if (isOpen)
+        {
+            @* Invisible full-screen layer: clicking anywhere outside the panel closes it. *@
+            <div class="bell-backdrop" @onclick="Close"></div>
+
+            <div class="bell-panel" role="dialog" aria-label="Notifications">
+                <div class="bell-panel-header">Notifications</div>
+
+                @if (items is null)
+                {
+                    <div class="bell-empty">Loading...</div>
+                }
+                else if (items.Count == 0)
+                {
+                    <div class="bell-empty">You don't have any notifications yet.</div>
+                }
+                else
+                {
+                    <ul class="bell-list">
+                        @foreach (var n in items)
+                        {
+                            <li>
+                                <button type="button" class="bell-item @(unreadIds.Contains(n.Id) ? "unread" : "")"
+                                        @onclick="() => Open(n)">
+                                    <div class="avatar avatar-sm">@PostCard.Initials(n.NotifierUser)</div>
+                                    <div class="bell-item-text">
+                                        <div><strong>@@@n.NotifierUser.Username</strong> @Describe(n)</div>
+                                        @if (Preview(n) is { Length: > 0 } preview)
+                                        {
+                                            <div class="bell-preview">@preview</div>
+                                        }
+                                        <div class="bell-time">@TimeAgo(n.DateCreated)</div>
+                                    </div>
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private int unreadCount;
+    private bool isOpen;
+    private List<Notification>? items;
+    private HashSet<int> unreadIds = new();   // unread when the panel was opened, for highlighting
+
+    private string AriaLabel => unreadCount == 0 ? "Notifications" : $"Notifications, {unreadCount} unread";
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUser.Changed += OnUserChanged;
+        Notifier.NotificationsChanged += OnNotificationsChanged;
+        await RefreshCountAsync();
+    }
+
+    private async Task RefreshCountAsync()
+    {
+        unreadCount = CurrentUser.User is { } me ? await Notifications.GetUnreadCountAsync(me.Id) : 0;
+    }
+
+    private async Task ToggleAsync()
+    {
+        if (isOpen)
+        {
+            Close();
+            return;
+        }
+        if (CurrentUser.User is not { } me) return;
+
+        isOpen = true;
+        items = null;
+        items = await Notifications.GetRecentAsync(me.Id);
+        unreadIds = items.Where(n => !n.IsRead).Select(n => n.Id).ToHashSet();
+
+        if (unreadCount > 0)
+        {
+            await Notifications.MarkAllReadAsync(me.Id);
+            unreadCount = 0;
+        }
+    }
+
+    private void Close()
+    {
+        isOpen = false;
+        items = null;
+    }
+
+    private void Open(Notification n)
+    {
+        Close();
+        // Follows go to the follower's profile; everything else goes to the post's page, scrolled
+        // to the comment when the notification is about one.
+        var url = n.PostId switch
+        {
+            null => $"profile/{Uri.EscapeDataString(n.NotifierUser.Username)}",
+            int postId when n.CommentId is int commentId => $"post/{postId}?comment={commentId}",
+            int postId => $"post/{postId}"
+        };
+        Navigation.NavigateTo(url);
+    }
+
+    private static string Describe(Notification n) => n.Type switch
+    {
+        Notification.TypeMention when n.CommentId is not null => "mentioned you in a comment",
+        Notification.TypeMention => "mentioned you in a post",
+        Notification.TypeLike => "liked your post",
+        Notification.TypeComment => "commented on your post",
+        Notification.TypeReply => "replied to your comment",
+        Notification.TypeCommentLike => "liked your comment",
+        Notification.TypeFollowedUserPost => "posted",
+        Notification.TypeCommunityPost => $"posted in {n.Post?.Community?.Name ?? "a community"}",
+        Notification.TypeHashTagPost => "posted with a hashtag you follow",
+        Notification.TypeFollowedPostComment => "commented on a post you follow",
+        Notification.TypeFollow => "followed you",
+        _ => "sent you a notification"
+    };
+
+    // The comment's text for comment notifications, otherwise the post's text (none for follows), shortened.
+    private static string Preview(Notification n)
+    {
+        var text = (n.Comment?.Content ?? n.Post?.Content ?? "").Trim();
+        return text.Length > 80 ? text[..80].TrimEnd() + "..." : text;
+    }
+
+    // Dates are stored in UTC (without a time zone), so compare against UtcNow.
+    private static string TimeAgo(DateTime utc)
+    {
+        var ago = DateTime.UtcNow - utc;
+        if (ago.TotalMinutes < 1) return "just now";
+        if (ago.TotalHours < 1) return $"{(int)ago.TotalMinutes}m ago";
+        if (ago.TotalDays < 1) return $"{(int)ago.TotalHours}h ago";
+        if (ago.TotalDays < 7) return $"{(int)ago.TotalDays}d ago";
+        return utc.ToString("MMM d, yyyy");
+    }
+
+    private void OnUserChanged() => _ = InvokeAsync(async () =>
+    {
+        Close();
+        await RefreshCountAsync();
+        StateHasChanged();
+    });
+
+    // Called from whichever user's action caused the change, so hop onto this component's own thread.
+    private void OnNotificationsChanged(int userId)
+    {
+        if (CurrentUser.User?.Id != userId) return;
+
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await RefreshCountAsync();
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+                // A failed refresh just leaves the old count; the next change or page load fixes it.
+            }
+        });
+    }
+
+    public void Dispose()
+    {
+        CurrentUser.Changed -= OnUserChanged;
+        Notifier.NotificationsChanged -= OnNotificationsChanged;
+    }
+}

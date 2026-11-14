@@ -20,6 +20,7 @@ public partial class RegularUser
     public int UserRoleID { get; set; }
 
     public virtual UserRole UserRole { get; set; } = null!;
+    public virtual ICollection<CommunityJoinRequest> CommunityJoinRequests { get; set; } = new List<CommunityJoinRequest>();
 
     public virtual ICollection<BlockedUser> BlockedUserRegularUserBlockeds { get; set; } = new List<BlockedUser>();
 
@@ -38,6 +39,10 @@ public partial class RegularUser
     public virtual ICollection<Follower> FollowerRegularUserFollowings { get; set; } = new List<Follower>();
 
     public virtual ICollection<HashTagFollow> HashTagFollows { get; set; } = new List<HashTagFollow>();
+
+    public virtual ICollection<Notification> NotificationNotifiedUsers { get; set; } = new List<Notification>();
+
+    public virtual ICollection<Notification> NotificationNotifierUsers { get; set; } = new List<Notification>();
 
     public virtual ICollection<PostFollow> PostFollows { get; set; } = new List<PostFollow>();
 

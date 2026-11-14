@@ -21,4 +21,9 @@ RUN dotnet publish "microblog-heads.csproj" -c $configuration -o /app/publish /p
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# The app runs as the non-root "app" user, so it can't create folders in /app itself.
+# Create the upload folder here and give that user ownership of it.
+USER root
+RUN mkdir -p /app/Media && chown app:app /app/Media
+USER app
 ENTRYPOINT ["dotnet", "microblog-heads.dll"]
