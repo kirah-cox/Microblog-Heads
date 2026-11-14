@@ -41,15 +41,7 @@
             <div class="d-flex flex-wrap gap-2 mb-2">
                 @foreach (var pm in Post.PostMedia)
                 {
-                    var url = "/media/" + pm.Media.Path;
-                    @if (MediaService.IsVideo(pm.Media.Path))
-                    {
-                        <video src="@url" controls class="post-media"></video>
-                    }
-                    else
-                    {
-                        <img src="@url" alt="Post attachment" class="post-media" loading="lazy" />
-                    }
+                    <img src="/media/@pm.Media.Path" alt="Post attachment" class="post-media" loading="lazy" />
                 }
             </div>
         }

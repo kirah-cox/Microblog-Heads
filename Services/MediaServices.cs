@@ -1,15 +1,15 @@
 namespace microblog_heads.Services;
 
+/// <summary>
+/// Saves uploaded pictures to the repo's Media folder (committed to git so everyone has the
+/// same files). The database stores only the file name, which the app serves at /media/{name}.
+/// </summary>
 public class MediaService
 {
     private static readonly HashSet<string> ImageExt = new(StringComparer.OrdinalIgnoreCase)
         { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
 
-    private static readonly HashSet<string> VideoExt = new(StringComparer.OrdinalIgnoreCase)
-        { ".mp4", ".webm" };
-
     public const long MaxImageBytes = 5 * 1024 * 1024;
-    public const long MaxVideoBytes = 25 * 1024 * 1024;
     public const int MaxFilesPerPost = 4;
 
     private readonly string _folder;
@@ -20,20 +20,16 @@ public class MediaService
         Directory.CreateDirectory(_folder);
     }
 
-    public static bool IsVideo(string fileName) => VideoExt.Contains(Path.GetExtension(fileName));
-
     public async Task<string> SaveFileAsync(Stream source, string originalName, long length)
     {
         var ext = Path.GetExtension(originalName).ToLowerInvariant();
-        var isImage = ImageExt.Contains(ext);
-        var isVideo = VideoExt.Contains(ext);
 
-        if (!isImage && !isVideo)
-            throw new ArgumentException("Only jpg, png, gif, webp, mp4 and webm files are allowed.");
-        
-         if (length > (isVideo ? MaxVideoBytes : MaxImageBytes))   
-            throw new ArgumentException(isVideo ? $"Videos can't exceed {MaxVideoBytes}MB." : $"Images can't exceed {MaxImageBytes}MB.");
-        
+        if (!ImageExt.Contains(ext))
+            throw new ArgumentException("Only jpg, png, gif and webp pictures are allowed.");
+
+        if (length > MaxImageBytes)
+            throw new ArgumentException($"Pictures can't exceed {MaxImageBytes / (1024 * 1024)}MB.");
+
         var fileName = Guid.NewGuid().ToString("N") + ext;
         await using var target = File.Create(Path.Combine(_folder, fileName));
         await source.CopyToAsync(target);

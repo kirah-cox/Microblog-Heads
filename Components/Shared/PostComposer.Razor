@@ -29,7 +29,7 @@
                 </div>
 
                 <InputFile @key="inputKey" OnChange="OnFilesChosen" multiple
-                           accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.webm"
+                           accept=".jpg,.jpeg,.png,.gif,.webp"
                            class="form-control form-control-sm mt-2" />
                 @if (files.Count > 0)
                 {
@@ -111,7 +111,7 @@
         {
             foreach (var f in files)
             {
-                await using var stream = f.OpenReadStream(MediaService.MaxVideoBytes);
+                await using var stream = f.OpenReadStream(MediaService.MaxImageBytes);
                 saved.Add(await MediaService.SaveFileAsync(stream, f.Name, f.Size));
             }
 
