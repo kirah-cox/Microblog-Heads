@@ -5,6 +5,8 @@
 @inject CurrentUserState CurrentUser
 @inject NavigationManager Navigation
 
+@inject DarkModeService DarkModeService
+
 <PageTitle>Create a community</PageTitle>
 
 <div class="feed mx-auto">
@@ -85,6 +87,7 @@
         {
             await CurrentUser.InitializeAsync();
         }
+        await DarkModeService.ApplyDarkModeAsync();
     }
 
     private async Task CreateAsync()

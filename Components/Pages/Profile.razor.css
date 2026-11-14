@@ -1,13 +1,22 @@
 .profile {
     max-width: 720px;
+    color: var(--mb-text);
+}
+
+body.dark-mode .profile {
+    color: var(--text-primary);
 }
 
 /* "N followers" stat: looks like the other stats, but is clickable. */
 .stat-link {
-    color: inherit;
+    color: var(--mb-text);
     text-decoration: none;
     vertical-align: baseline;
     border: 0;
+}
+
+body.dark-mode .stat-link {
+    color: var(--text-primary);
 }
 
     .stat-link span {
@@ -21,8 +30,12 @@
     }
 
 .follower-link {
-    color: inherit;
+    color: var(--mb-text);
     text-decoration: none;
+}
+
+body.dark-mode .follower-link {
+    color: var(--text-primary);
 }
 
     .follower-link:hover strong {
@@ -66,6 +79,11 @@
 
 .community-description {
     overflow-wrap: anywhere;
+    color: var(--mb-text);
+}
+
+body.dark-mode .community-description {
+    color: var(--text-primary);
 }
 
 .block-btn {

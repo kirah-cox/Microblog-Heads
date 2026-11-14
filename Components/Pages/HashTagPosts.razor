@@ -9,6 +9,7 @@
 @inject PostService PostService
 @inject CommentService CommentService
 @inject NavigationManager Navigation
+@inject DarkModeService DarkModeService
 
 @* All posts tagged with one hashtag, newest first. Reached by clicking a hashtag on a post. *@
 
@@ -119,6 +120,7 @@
         {
             await CurrentUser.InitializeAsync();
         }
+        await DarkModeService.ApplyDarkModeAsync();
     }
 
     private async Task LoadAsync()

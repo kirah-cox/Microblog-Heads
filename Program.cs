@@ -33,6 +33,7 @@ builder.Services.AddScoped<CommunityService>();
 builder.Services.AddScoped<HashTagService>();
 builder.Services.AddScoped<DisplayService>();
 builder.Services.AddScoped<CurrentUserState>();
+builder.Services.AddScoped<DarkModeService>();
 
 var app = builder.Build();
 

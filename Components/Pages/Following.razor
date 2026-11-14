@@ -8,6 +8,7 @@
 @inject PostService PostService
 @inject CommentService CommentService
 @inject NavigationManager Navigation
+@inject DarkModeService DarkModeService
 
 @* Posts from everything the signed-in user follows: people, communities, hashtags and
    individual posts (DisplayService.GetAllFollowingPostsbyUserIDAsync), newest first. *@
@@ -80,6 +81,7 @@
         {
             await CurrentUser.InitializeAsync();
         }
+        await DarkModeService.ApplyDarkModeAsync();
     }
 
     private async Task LoadAsync()

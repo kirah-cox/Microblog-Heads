@@ -1,5 +1,6 @@
 ﻿@page "/Error"
 @using System.Diagnostics
+@inject DarkModeService DarkModeService
 
 <PageTitle>Error</PageTitle>
 
@@ -33,4 +34,9 @@
 
     protected override void OnInitialized() =>
         RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await DarkModeService.ApplyDarkModeAsync();
+    }
 }

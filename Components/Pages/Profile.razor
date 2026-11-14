@@ -11,6 +11,7 @@
 @inject PostService PostService
 @inject CommentService CommentService
 @inject NavigationManager Navigation
+@inject DarkModeService DarkModeService
 
 <PageTitle>@(profileUser is null ? "Profile" : $"{profileUser.FirstName} {profileUser.LastName} (@{profileUser.Username})")</PageTitle>
 
@@ -359,6 +360,8 @@ else
             focusModal = false;
             await modalElement.FocusAsync();
         }
+
+        await DarkModeService.ApplyDarkModeAsync();
     }
 
     private string ModalTitle => openModal switch

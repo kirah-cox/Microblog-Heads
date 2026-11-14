@@ -9,6 +9,7 @@
 @inject PostService PostService
 @inject CommentService CommentService
 @inject NavigationManager Navigation
+@inject DarkModeService DarkModeService
 
 @* Home page. Logged-in users see their For You feed; everyone else is sent to /login. *@
 
@@ -24,7 +25,7 @@
 
     @if (CurrentUser.IsLoggedIn)
     {
-        <PostComposer OnPosted="LoadAsync"/>
+        <PostComposer OnPosted="LoadAsync" />
     }
     @* Logged-out users are redirected to /login, so they only see the spinner briefly. *@
     @if (!CurrentUser.IsInitialized || !CurrentUser.IsLoggedIn || isLoading)
@@ -87,6 +88,7 @@
         {
             await CurrentUser.InitializeAsync();
         }
+        await DarkModeService.ApplyDarkModeAsync();
     }
 
     private async Task LoadAsync()

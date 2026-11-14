@@ -10,6 +10,8 @@
 @inject CommentService CommentService
 @inject NavigationManager Navigation
 
+@inject DarkModeService DarkModeService
+
 @* All posts in one community, newest first. Reached by clicking a community name on a post. *@
 
 <PageTitle>@(community?.Name ?? "Community")</PageTitle>
@@ -41,28 +43,27 @@
                     <p class="mb-2 community-description">@community.Description</p>
                     <div class="text-muted small">@posts.Count @(posts.Count == 1 ? "post" : "posts"), newest first</div>
 
-                @if (CurrentUser.IsLoggedIn)
-                {
-                    <div class="mt-3">
-                        @if (myRole is not null)
-                        {
-                            @* There's no leave-community service yet, so membership is shown, not toggled. *@
-                            <span class="badge rounded-pill member-badge">✓ Member · @myRole</span>
-                        }
-                        else
-                        {
-                            <button type="button" class="btn btn-primary rounded-pill join-btn" disabled="@isJoining"
-                                    title="Join to see @community.Name's posts on your Following page"
-                                    @onclick="JoinAsync">
-                                @(isJoining ? "Joining..." : "Join")
-                            </button>
-                        }
-                        @if (!string.IsNullOrEmpty(joinError))
-                        {
-                            <div class="text-danger small mt-1">@joinError</div>
-                        }
-                    </div>
-                }
+                    @if (CurrentUser.IsLoggedIn)
+                    {
+                        <div class="mt-3">
+                            @if (myRole is not null)
+                            {
+                                @* There's no leave-community service yet, so membership is shown, not toggled. *@
+                                <span class="badge rounded-pill member-badge">✓ Member · @myRole</span>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-primary rounded-pill join-btn" disabled="@isJoining"
+                                        title="Join to see @community.Name's posts on your Following page" @onclick="JoinAsync">
+                                    @(isJoining ? "Joining..." : "Join")
+                                </button>
+                            }
+                            @if (!string.IsNullOrEmpty(joinError))
+                            {
+                                <div class="text-danger small mt-1">@joinError</div>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
         </section>
@@ -91,8 +92,7 @@
 
                             @if (myRole == "Admin")
                             {
-                                <select class="form-select form-select-sm" style="width: auto"
-                                        value="@m.CommunityRole.Role"
+                                <select class="form-select form-select-sm" style="width: auto" value="@m.CommunityRole.Role"
                                         disabled="@(changingRoleFor == m.RegularUserId)"
                                         @onchange="e => ChangeRoleAsync(m, e.Value?.ToString() ?? m.CommunityRole.Role)">
                                     @foreach (var r in roleOptions)
@@ -135,7 +135,7 @@
     private Community? community;
     private List<Post> posts = new();
     private readonly HashSet<int> followingIds = new(); // users the signed-in user follows
-    private readonly HashSet<int> likedPostIds = new();    // posts the signed-in user liked
+    private readonly HashSet<int> likedPostIds = new(); // posts the signed-in user liked
     private readonly HashSet<int> likedCommentIds = new(); // comments the signed-in user liked
     private bool isLoading = true;
     private string? errorMessage;
@@ -144,7 +144,7 @@
     private string? joinError;
     private List<CommunityUserRole> members = new();
     private readonly string[] roleOptions = { "Admin", "Moderator", "Follower" };
-    private int? changingRoleFor;   // RegularUserId of the member being changed
+    private int? changingRoleFor; // RegularUserId of the member being changed
     private string? roleError;
 
 
@@ -152,7 +152,8 @@
     {
         CurrentUser.Changed += OnCurrentUserChanged;
     }
-    
+
+
     protected override async Task OnParametersSetAsync()
     {
         // Runs again when moving between communities without leaving this page.
@@ -170,6 +171,7 @@
         {
             await CurrentUser.InitializeAsync();
         }
+        await DarkModeService.ApplyDarkModeAsync();
     }
     private async Task LoadMembersAsync() =>
     members = await CommunityService.GetCommunityMembersAsync(CommunityId);
@@ -282,15 +284,15 @@
         try
         {
             await CommunityService.AssignRoleAsync(me.Id, CommunityId, member.RegularUserId, newRole);
-            myRole = await GetMyRoleAsync(me.Id);   // in case you changed your own role
+            myRole = await GetMyRoleAsync(me.Id); // in case you changed your own role
         }
         catch (Exception ex)
         {
-            roleError = ex.Message;   // e.g. "A community must keep at least one admin."
+            roleError = ex.Message; // e.g. "A community must keep at least one admin."
         }
         finally
         {
-            await LoadMembersAsync();   // reload either way, so the dropdown shows the real role
+            await LoadMembersAsync(); // reload either way, so the dropdown shows the real role
             changingRoleFor = null;
         }
     }

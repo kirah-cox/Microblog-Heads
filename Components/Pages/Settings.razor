@@ -1,0 +1,67 @@
+@page "/settings"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject CurrentUserState CurrentUser
+@inject IJSRuntime JS
+
+<div class="settings-section">
+    <h3>Theme</h3>
+    <div class="setting-item">
+        <label>Dark Mode</label>
+        <input type="checkbox" @onchange="ToggleDarkMode" checked="@isDarkMode">
+    </div>
+</div>
+
+@code {
+    private bool isDarkMode = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsInitialized)
+        {
+            await CurrentUser.InitializeAsync();
+        }
+        if (!CurrentUser.IsLoggedIn)
+        {
+            Navigation.NavigateTo("login", replace: true);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isDarkMode = await GetDarkModeSetting();
+            await ApplyTheme(isDarkMode);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleDarkMode(ChangeEventArgs e)
+    {
+        isDarkMode = (bool)e.Value;
+        await SaveDarkModeSetting(isDarkMode);
+        await ApplyTheme(isDarkMode);
+    }
+
+    private async Task<bool> GetDarkModeSetting()
+    {
+        var value = await JS.InvokeAsync<string>("localStorage.getItem", "darkMode");
+        return value == "True";
+    }
+    private async Task SaveDarkModeSetting(bool isDark)
+    {
+        await JS.InvokeAsync<object>("localStorage.setItem", "darkMode", isDark.ToString());
+    }
+    private async Task ApplyTheme(bool isDark)
+    {
+        if (isDark)
+        {
+            await JS.InvokeAsync<object>("document.body.classList.add", "dark-mode");
+        }
+        else
+        {
+            await JS.InvokeAsync<object>("document.body.classList.remove", "dark-mode");
+        }
+    }
+}
