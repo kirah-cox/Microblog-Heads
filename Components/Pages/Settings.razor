@@ -15,15 +15,23 @@
 @code {
     private bool isDarkMode = false;
 
-    protected override async Task OnInitializedAsync()
+      protected override async Task OnInitializedAsync()
     {
-        if (!CurrentUser.IsInitialized)
+        try
         {
-            await CurrentUser.InitializeAsync();
+            if (!CurrentUser.IsInitialized)
+            {
+                await CurrentUser.InitializeAsync();
+            }
+            
+            if (!CurrentUser.IsLoggedIn)
+            {
+                Navigation.NavigateTo("login", replace: true);
+            }
         }
-        if (!CurrentUser.IsLoggedIn)
+        catch (Exception ex)
         {
-            Navigation.NavigateTo("login", replace: true);
+            Console.WriteLine($"Settings error: {ex}");
         }
     }
 

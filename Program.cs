@@ -38,6 +38,7 @@ builder.Services.AddScoped<DisplayService>();
 builder.Services.AddScoped<CurrentUserState>();
 builder.Services.AddSingleton<MediaService>();
 builder.Services.AddScoped<DarkModeService>();
+builder.Services.AddScoped<MissuseService>();
 
 var app = builder.Build();
 

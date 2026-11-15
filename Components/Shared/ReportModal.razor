@@ -1,0 +1,133 @@
+@using microblog_heads.Components.Pages
+@using microblog_heads.Services
+@inject MissuseService MissuseService
+@inject CurrentUserState CurrentUser
+@inject NavigationManager Navigation
+
+@if (showModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Report @ItemType</h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    @if (errorMessage != null)
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Reason for Report</label>
+                        <select class="form-select" @bind="selectedType">
+                            <option value="">-- Select a reason --</option>
+                            <option value="Spam">Spam</option>
+                            <option value="Offensive/Hateful">Offensive/Hateful</option>
+                            <option value="Harassment">Harassment/Bullying</option>
+                            <option value="Misinformation">Misinformation</option>
+                            <option value="Adult Content">Adult Content</option>
+                            <option value="Copyright">Copyright Infringement</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description (optional)</label>
+                        <textarea class="form-control" @bind="description" rows="4"
+                                  placeholder="Tell us more about why you're reporting this..."></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="Close">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="SubmitReport" disabled="@isSubmitting">
+                        @(isSubmitting ? "Submitting..." : "Report")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code{
+    [Parameter]
+    public string ItemType {get; set;} = "Post"; //"Post" or "Comment"
+
+    [Parameter]
+    public int PostId {get; set;} // For Post
+
+    [Parameter]
+    public int CommentId {get; set;} //For comments
+
+    [Parameter]
+    public EventCallback OnClose {get; set;}
+
+    private bool showModal = false;
+    private string selectedType = "";
+    private string description = "";
+    private bool isSubmitting = false;
+    private string? errorMessage = null;
+
+    public async Task OpenAsync()
+    {
+        showModal = true;
+        selectedType = "";
+        description = "";
+        errorMessage = "";
+        StateHasChanged();
+    }
+
+    private async Task Close()
+    {
+        showModal = false;
+        StateHasChanged();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task SubmitReport()
+    {
+        if (string.IsNullOrWhiteSpace(selectedType))
+        {
+            errorMessage = "Please select a reason for reporting.";
+            return;
+        }
+        isSubmitting = true;
+        errorMessage = null;
+        try
+        {
+            if(ItemType == "Post")
+            {
+                await MissuseService.ReportPostAsync(
+                    CurrentUser.User!.Id,
+                    PostId,
+                    selectedType,
+                    description ?? ""
+                );
+            }
+            else if(ItemType == "Comment")
+            {
+                await MissuseService.ReportCommentAsync(
+                    CurrentUser.User!.Id,
+                    CommentId,
+                    selectedType,
+                    description ?? ""
+                );
+            }
+            showModal = false;
+            await OnClose.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error submitting report{ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+}

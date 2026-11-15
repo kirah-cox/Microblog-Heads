@@ -1,0 +1,215 @@
+@page "/admin/reports"
+@rendermode InteractiveServer
+@using microblog_heads.Models
+@using microblog_heads.Services
+@inject MissuseService MissuseService
+@inject CurrentUserState CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Admin - Misuse Reports</PageTitle>
+
+@if (!isInitialized)
+{
+    <div class="spinner-border"></div>
+}
+else if (!isAdmin)
+{
+    <div class="alert alert-danger">You don't have permission to view this page.</div>
+}
+else
+{
+    <div class="container mt-4">
+        <h1>Misuse Reports</h1>
+        
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link @(activeTab == "posts" ? "active" : "")" href="#" @onclick="SelectPostsTab" @onclick:preventDefault="true">
+                    Post Reports (@groupedPostReports.Count)
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @(activeTab == "comments" ? "active" : "")" href="#" @onclick="SelectCommentsTab" @onclick:preventDefault="true">
+                    Comment Reports (@groupedCommentReports.Count)
+                </a>
+            </li>
+        </ul>
+
+        @if (activeTab == "posts")
+        {
+            @if (groupedPostReports.Count == 0)
+            {
+                <p class="text-muted">No post reports yet.</p>
+            }
+            else
+            {
+                @foreach (var group in groupedPostReports)
+                {
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Post by @group.Post.RegularUser.Username</strong>
+                                    <span class="badge bg-danger ms-2">@group.ReportCount Reports</span>
+                                </div>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => TogglePostExpand(group.Post.Id)">
+                                    @(expandedPostIds.Contains(group.Post.Id) ? "Hide" : "Show") Details
+                                </button>
+                            </div>
+                            <p class="mb-0 mt-2">@group.Post.Content.Substring(0, Math.Min(100, group.Post.Content.Length))...</p>
+                            <small class="text-muted">Reasons: @string.Join(", ", group.ReportReasons)</small>
+                        </div>
+
+                        @if (expandedPostIds.Contains(group.Post.Id))
+                        {
+                            <div class="card-body">
+                                <h6>Reports (@group.Reports.Count):</h6>
+                                <ul class="list-group">
+                                    @foreach (var report in group.Reports)
+                                    {
+                                        <li class="list-group-item">
+                                            <strong>@report.RegularUser.Username</strong> reported for <strong>@report.MissuseName</strong>
+                                            <br />
+                                            <small class="text-muted">@report.MissuseDescription</small>
+                                            <br />
+                                            <small class="text-muted">@report.Post.DatePosted.ToShortDateString()</small>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+
+                            <div class="card-footer">
+                                <button class="btn btn-sm btn-info" @onclick="() => ViewPost(group.Post.Id)">View Post</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => DismissPostReports(group.Post.Id)">Dismiss All</button>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        }
+
+        @if (activeTab == "comments")
+        {
+            @if (groupedCommentReports.Count == 0)
+            {
+                <p class="text-muted">No comment reports yet.</p>
+            }
+            else
+            {
+                @foreach (var group in groupedCommentReports)
+                {
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Comment by @group.Comment.RegularUser.Username</strong>
+                                    <span class="badge bg-danger ms-2">@group.ReportCount Reports</span>
+                                </div>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ToggleCommentExpand(group.Comment.Id)">
+                                    @(expandedCommentIds.Contains(group.Comment.Id) ? "Hide" : "Show") Details
+                                </button>
+                            </div>
+                            <p class="mb-0 mt-2">@group.Comment.Content.Substring(0, Math.Min(100, group.Comment.Content.Length))...</p>
+                            <small class="text-muted">Reasons: @string.Join(", ", group.ReportReasons)</small>
+                        </div>
+
+                        @if (expandedCommentIds.Contains(group.Comment.Id))
+                        {
+                            <div class="card-body">
+                                <h6>Reports (@group.Reports.Count):</h6>
+                                <ul class="list-group">
+                                    @foreach (var report in group.Reports)
+                                    {
+                                        <li class="list-group-item">
+                                            <strong>@report.RegularUser.Username</strong> reported for <strong>@report.MissuseName</strong>
+                                            <br />
+                                            <small class="text-muted">@report.MissuseDescription</small>
+                                            <br />
+                                            <small class="text-muted">@report.Comment.DatePosted.ToShortDateString()</small>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+
+                            <div class="card-footer">
+                                <button class="btn btn-sm btn-danger" @onclick="() => DismissCommentReports(group.Comment.Id)">Dismiss All</button>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        }
+    </div>
+}
+
+@code {
+    private List<GroupedPostReport> groupedPostReports = new();
+    private List<GroupedCommentReport> groupedCommentReports = new();
+    private HashSet<int> expandedPostIds = new();
+    private HashSet<int> expandedCommentIds = new();
+    private bool isAdmin = false;
+    private bool isInitialized = false;
+    private string activeTab = "posts";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsInitialized)
+        {
+            await CurrentUser.InitializeAsync();
+        }
+
+        if (CurrentUser.User?.UserRoleID != UserRole.AdminRoleId)
+        {
+            Navigation.NavigateTo("login", replace: true);
+            return;
+        }
+
+        isAdmin = true;
+
+        groupedPostReports = await MissuseService.GetGroupedPostReportsAsync();
+        groupedCommentReports = await MissuseService.GetGroupedCommentReportsAsync();
+
+        isInitialized = true;
+        StateHasChanged();
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        activeTab = tab;
+    }
+
+    private void SelectPostsTab() => activeTab = "posts";
+
+    private void SelectCommentsTab() => activeTab = "comments";
+
+    private void ViewPost(int postId) => Navigation.NavigateTo($"/post/{postId}");
+
+    private void TogglePostExpand(int postId)
+    {
+        if (expandedPostIds.Contains(postId))
+            expandedPostIds.Remove(postId);
+        else
+            expandedPostIds.Add(postId);
+    }
+
+    private void ToggleCommentExpand(int commentId)
+    {
+        if (expandedCommentIds.Contains(commentId))
+            expandedCommentIds.Remove(commentId);
+        else
+            expandedCommentIds.Add(commentId);
+    }
+
+    private async Task DismissPostReports(int postId)
+    {
+        await MissuseService.DeletePostReportsAsync(postId);
+        groupedPostReports = await MissuseService.GetGroupedPostReportsAsync();
+        StateHasChanged();
+    }
+
+    private async Task DismissCommentReports(int commentId)
+    {
+        await MissuseService.DeleteCommentReportsAsync(commentId);
+        groupedCommentReports = await MissuseService.GetGroupedCommentReportsAsync();
+        StateHasChanged();
+    }
+}
