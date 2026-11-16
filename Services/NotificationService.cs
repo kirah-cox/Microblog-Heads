@@ -244,6 +244,21 @@ public class NotificationService
         NotifyAfterSave(db, affected);
     }
 
+    /// <summary>
+    /// Call before deleting comments: their notifications are removed by the cascade, so refresh
+    /// the bells of users who had unread ones once the delete is saved.
+    /// </summary>
+    public async Task NotifyForDeletedCommentsAsync(AppDbContext db, IEnumerable<int> commentIds)
+    {
+        var ids = commentIds.ToList();
+        var affected = await db.Notifications
+            .Where(n => n.CommentId != null && ids.Contains(n.CommentId.Value) && !n.IsRead)
+            .Select(n => n.NotifiedUserId)
+            .Distinct()
+            .ToListAsync();
+        NotifyAfterSave(db, affected);
+    }
+
     // Keeps the first reason given for each user (callers add reasons in priority order).
     private static void AddReason(Dictionary<int, string> reasons, IEnumerable<int> userIds, string type)
     {

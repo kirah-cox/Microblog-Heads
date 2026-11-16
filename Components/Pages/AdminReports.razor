@@ -5,6 +5,9 @@
 @inject MissuseService MissuseService
 @inject CurrentUserState CurrentUser
 @inject NavigationManager Navigation
+@inject PostService PostService
+@inject CommentService CommentService
+@inject IJSRuntime JS
 
 <PageTitle>Admin - Misuse Reports</PageTitle>
 
@@ -20,17 +23,26 @@ else
 {
     <div class="container mt-4">
         <h1>Misuse Reports</h1>
+
+        @if (actionError != null)
+        {
+            <div class="alert alert-danger alert-dismissible" role="alert">
+                @actionError
+                <button type="button" class="btn-close" aria-label="Close" @onclick="() => actionError = null"></button>
+            </div>
+        }
         
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
-                <a class="nav-link @(activeTab == "posts" ? "active" : "")" href="#" @onclick="SelectPostsTab" @onclick:preventDefault="true">
+                @* Buttons, not href="#" links: with <base href="/"> a "#" link navigates to the For You page. *@
+                <button type="button" class="nav-link @(activeTab == "posts" ? "active" : "")" @onclick="SelectPostsTab">
                     Post Reports (@groupedPostReports.Count)
-                </a>
+                </button>
             </li>
             <li class="nav-item">
-                <a class="nav-link @(activeTab == "comments" ? "active" : "")" href="#" @onclick="SelectCommentsTab" @onclick:preventDefault="true">
+                <button type="button" class="nav-link @(activeTab == "comments" ? "active" : "")" @onclick="SelectCommentsTab">
                     Comment Reports (@groupedCommentReports.Count)
-                </a>
+                </button>
             </li>
         </ul>
 
@@ -79,7 +91,8 @@ else
 
                             <div class="card-footer">
                                 <button class="btn btn-sm btn-info" @onclick="() => ViewPost(group.Post.Id)">View Post</button>
-                                <button class="btn btn-sm btn-danger" @onclick="() => DismissPostReports(group.Post.Id)">Dismiss All</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => DismissPostReports(group.Post.Id)">Dismiss All</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => DeletePost(group.Post.Id)">Delete Post</button>
                             </div>
                         }
                     </div>
@@ -131,7 +144,9 @@ else
                             </div>
 
                             <div class="card-footer">
-                                <button class="btn btn-sm btn-danger" @onclick="() => DismissCommentReports(group.Comment.Id)">Dismiss All</button>
+                                <button class="btn btn-sm btn-info" @onclick="() => ViewComment(group.Comment)">View Comment</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => DismissCommentReports(group.Comment.Id)">Dismiss All</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => DeleteComment(group.Comment.Id)">Delete Comment</button>
                             </div>
                         }
                     </div>
@@ -147,15 +162,20 @@ else
     private HashSet<int> expandedPostIds = new();
     private HashSet<int> expandedCommentIds = new();
     private bool isAdmin = false;
+    private string? actionError;
     private bool isInitialized = false;
     private string activeTab = "posts";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!CurrentUser.IsInitialized)
+        // Who is signed in lives in browser storage, which is only readable once the page is
+        // interactive (not during prerendering), so the admin check has to wait until here.
+        if (!firstRender)
         {
-            await CurrentUser.InitializeAsync();
+            return;
         }
+
+        await CurrentUser.InitializeAsync();
 
         if (CurrentUser.User?.UserRoleID != UserRole.AdminRoleId)
         {
@@ -183,6 +203,9 @@ else
 
     private void ViewPost(int postId) => Navigation.NavigateTo($"/post/{postId}");
 
+    // Opens the comment's post with that comment highlighted and scrolled into view.
+    private void ViewComment(Comment comment) => Navigation.NavigateTo($"/post/{comment.PostId}?comment={comment.Id}");
+
     private void TogglePostExpand(int postId)
     {
         if (expandedPostIds.Contains(postId))
@@ -209,6 +232,49 @@ else
     private async Task DismissCommentReports(int commentId)
     {
         await MissuseService.DeleteCommentReportsAsync(commentId);
+        groupedCommentReports = await MissuseService.GetGroupedCommentReportsAsync();
+        StateHasChanged();
+    }
+
+    // Deleting a post also removes its comments and all their reports (database cascade),
+    // so both lists are reloaded.
+    private async Task DeletePost(int postId)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this post? Its comments and reports will be deleted too. This can't be undone."))
+            return;
+
+        actionError = null;
+        try
+        {
+            await PostService.DeletePostAsync(CurrentUser.User!.Id, postId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            actionError = ex.Message;
+        }
+        await ReloadReportsAsync();
+    }
+
+    private async Task DeleteComment(int commentId)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this comment? Its replies and reports will be deleted too. This can't be undone."))
+            return;
+
+        actionError = null;
+        try
+        {
+            await CommentService.DeleteCommentAsync(CurrentUser.User!.Id, commentId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            actionError = ex.Message;
+        }
+        await ReloadReportsAsync();
+    }
+
+    private async Task ReloadReportsAsync()
+    {
+        groupedPostReports = await MissuseService.GetGroupedPostReportsAsync();
         groupedCommentReports = await MissuseService.GetGroupedCommentReportsAsync();
         StateHasChanged();
     }

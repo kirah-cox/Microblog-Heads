@@ -34,7 +34,7 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">Description</label>
+                    <label class="form-label">Description <span class="text-muted small">(required)</span></label>
                     <textarea class="form-control" rows="3" @bind="description" @bind:event="oninput"></textarea>
                     <small class="@(description.Length > 200 ? "text-danger" : "text-muted")">@description.Length / 200</small>
                 </div>
@@ -60,7 +60,7 @@
                     <div class="alert alert-danger">@error</div>
                 }
 
-                <button type="button" class="btn btn-primary" disabled="@isSaving" @onclick="CreateAsync">
+                <button type="button" class="btn btn-primary" disabled="@(isSaving || !CanSubmit)" @onclick="CreateAsync">
                     @(isSaving ? "Creating..." : "Create community")
                 </button>
             </div>
@@ -76,6 +76,10 @@
     private string? error;
     private bool isSaving;
     private bool isPrivate;
+
+    // Mirrors CommunityService.CreateCommunityAsync's checks (name 1-50, description 1-200 chars).
+    private bool CanSubmit =>
+        name.Trim().Length is > 0 and <= 50 && description.Trim().Length is > 0 and <= 200;
 
     protected override void OnInitialized()
     {

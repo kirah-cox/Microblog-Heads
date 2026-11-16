@@ -3,6 +3,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject CurrentUserState CurrentUser
 @inject NavigationManager Navigation
+@inject DarkModeService DarkModeService
 
 <PageTitle>Log in</PageTitle>
 
@@ -64,6 +65,7 @@
     {
         if (firstRender)
         {
+            await DarkModeService.ApplyDarkModeAsync();
             await CurrentUser.InitializeAsync(); // no-op if already restored
             if (CurrentUser.IsLoggedIn)
             {

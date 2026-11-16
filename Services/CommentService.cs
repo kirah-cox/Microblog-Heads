@@ -21,6 +21,64 @@ public class CommentService
         return await db.Comments.FindAsync(commentId);
     }
 
+    /// <summary>
+    /// Deletes a comment. Allowed for the comment's author, site admins, and admins/moderators of
+    /// the community the post is in. The database's cascade deletes remove its replies, likes,
+    /// reports and notifications.
+    /// </summary>
+    public async Task DeleteCommentAsync(int userId, int commentId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var comment = await db.Comments
+            .Include(c => c.Post)
+            .FirstOrDefaultAsync(c => c.Id == commentId);
+        if (comment is null)
+            throw new InvalidOperationException("That comment no longer exists.");
+
+        if (comment.RegularUserId != userId)
+        {
+            var isSiteAdmin = await db.RegularUsers
+                .AnyAsync(u => u.Id == userId && u.UserRoleID == UserRole.AdminRoleId);
+            var isStaff = comment.Post.CommunityId is int cid
+                && await db.CommunityUserRoles.AnyAsync(r => r.CommunityId == cid
+                    && r.RegularUserId == userId
+                    && (r.CommunityRole.Role == "Admin" || r.CommunityRole.Role == "Moderator"));
+
+            if (!isSiteAdmin && !isStaff)
+                throw new InvalidOperationException("You can only delete your own comments.");
+        }
+
+        // The comment and every reply under it (the cascade removes those too).
+        var postComments = await db.Comments
+            .Where(c => c.PostId == comment.PostId)
+            .Select(c => new { c.Id, c.ParentCommentId })
+            .ToListAsync();
+        var deletedIds = new HashSet<int> { comment.Id };
+        bool added;
+        do
+        {
+            added = false;
+            foreach (var c in postComments)
+            {
+                if (c.ParentCommentId is int parentId && deletedIds.Contains(parentId) && deletedIds.Add(c.Id))
+                    added = true;
+            }
+        } while (added);
+
+        await _notifications.NotifyForDeletedCommentsAsync(db, deletedIds);
+        db.Comments.Remove(comment);
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new InvalidOperationException("Could not delete the comment.", ex);
+        }
+    }
+
     public async Task<List<Comment>> GetCommentsByPostIdAsync(int postId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();

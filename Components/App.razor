@@ -18,6 +18,8 @@
 </head>
 
 <body>
+    @* Apply saved dark mode before anything paints, so pages don't flash white (see js/app.js). *@
+    <script>try { if ((localStorage.getItem("darkMode") || "").toLowerCase() === "true") document.body.classList.add("dark-mode"); } catch { }</script>
     <Routes />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>

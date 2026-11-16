@@ -36,12 +36,14 @@ public class PostService
             throw new InvalidOperationException("That post no longer exists.");
         if (post.RegularUserId != userId)
         {
+            var isSiteAdmin = await db.RegularUsers
+                .AnyAsync(u => u.Id == userId && u.UserRoleID == UserRole.AdminRoleId);
             var isStaff = post.CommunityId is int cid
                 && await db.CommunityUserRoles.AnyAsync(r => r.CommunityId == cid
                     && r.RegularUserId == userId
                     && (r.CommunityRole.Role == "Admin" || r.CommunityRole.Role == "Moderator"));
 
-            if (!isStaff)
+            if (!isSiteAdmin && !isStaff)
                 throw new InvalidOperationException("You can only delete your own posts.");
         }
 
