@@ -104,7 +104,7 @@ public class CommunityService
                 {
                     CommunityId = communityId,
                     RegularUserId = userId,
-                    DateRequested = DateTime.UtcNow
+                    DateRequested = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) // column is "timestamp without time zone"; Npgsql rejects Kind=Utc
                 });
                 await db.SaveChangesAsync();
             }

@@ -365,3 +365,87 @@ h1:focus {
     background-color: var(--mb-surface);
     border-color: var(--mb-border);
 }
+
+/* ---------- Dark mode: modals and the admin reports page ----------
+   Restored from 3bb1128 (dropped in the merge). Text boxes, dropdowns, labels, list items and
+   .btn-secondary are styled in the dark-mode block near the top of this file. */
+body.dark-mode .modal-content {
+    --bs-modal-color: var(--mb-text);
+    --bs-modal-header-border-color: var(--mb-border);
+    --bs-modal-footer-border-color: var(--mb-border);
+    color: var(--mb-text);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+body.dark-mode .modal-content .btn-close,
+body.dark-mode .alert .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+body.dark-mode .modal-backdrop.show {
+    opacity: 0.7;
+}
+
+/* Browser autofill would otherwise paint saved usernames/passwords on a light background. */
+body.dark-mode .form-control:-webkit-autofill {
+    -webkit-text-fill-color: var(--mb-text);
+    -webkit-box-shadow: 0 0 0 1000px var(--mb-surface) inset;
+    caret-color: var(--mb-text);
+}
+
+body.dark-mode .form-control::placeholder {
+    color: var(--mb-muted);
+}
+
+body.dark-mode .form-select option {
+    background-color: var(--mb-surface);
+    color: var(--mb-text);
+}
+
+body.dark-mode .form-check-input:not(:checked) {
+    background-color: var(--mb-canvas);
+    border-color: var(--mb-muted);
+}
+
+body.dark-mode .form-check-input:checked {
+    background-color: var(--mb-accent);
+    border-color: var(--mb-accent);
+}
+
+body.dark-mode .text-danger {
+    color: var(--mb-danger) !important;
+}
+
+body.dark-mode .alert-danger {
+    --bs-alert-color: #ffb3b3;
+    --bs-alert-bg: #3a1c1c;
+    --bs-alert-border-color: #6b2c2c;
+}
+
+/* Admin reports page: report cards and the Post/Comment tabs. */
+body.dark-mode .card {
+    color: var(--mb-text);
+}
+
+body.dark-mode .card-header,
+body.dark-mode .card-footer {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .nav-tabs {
+    --bs-nav-tabs-border-color: var(--mb-border);
+    --bs-nav-tabs-link-hover-border-color: var(--mb-border) var(--mb-border) var(--mb-border);
+    --bs-nav-tabs-link-active-color: var(--mb-text);
+    --bs-nav-tabs-link-active-bg: var(--mb-surface);
+    --bs-nav-tabs-link-active-border-color: var(--mb-border) var(--mb-border) var(--mb-surface);
+}
+
+body.dark-mode .nav-tabs .nav-link:not(.active) {
+    color: var(--mb-muted);
+}
+
+body.dark-mode .btn-outline-secondary {
+    --bs-btn-hover-bg: #2a2a2a;
+    --bs-btn-hover-border-color: var(--mb-border);
+}
