@@ -93,6 +93,68 @@ body.dark-mode .btn-light {
     border-color: var(--mb-border);
 }
 
+body.dark-mode .input-group-text {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .form-control {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .form-control:focus {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-accent);
+    box-shadow: 0 0 0 0.25rem rgba(20, 163, 159, 0.25);
+}
+
+body.dark-mode .form-select {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+}
+
+body.dark-mode .form-select:focus {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-accent);
+    box-shadow: 0 0 0 0.25rem rgba(20, 163, 159, 0.25);
+}
+
+body.dark-mode .form-label {
+    color: var(--text-primary);
+}
+
+body.dark-mode .btn-secondary {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .btn-secondary:hover {
+    background-color: var(--mb-accent-soft);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .list-group-item {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .form-select-sm {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+}
+
 /* Apply variables to elements */
 body {
     background-color: var(--bg-primary);
@@ -297,4 +359,9 @@ h1:focus {
 .modal-content {
     --bs-modal-bg: var(--mb-surface);
     background-color: var(--mb-surface);
+}
+
+.empty-state {
+    background-color: var(--mb-surface);
+    border-color: var(--mb-border);
 }
