@@ -11,6 +11,7 @@
 @inject NavigationManager Navigation
 
 @inject DarkModeService DarkModeService
+@inject MissuseService MissuseService
 
 @* All posts in one community, newest first. Reached by clicking a community name on a post. *@
 
@@ -40,6 +41,10 @@
                 <div class="avatar avatar-md" aria-hidden="true">@community.Name.FirstOrDefault()</div>
                 <div class="min-w-0 flex-fill">
                     <h1 class="h3 mb-1">@community.Name</h1>
+                    @if (community.IsPrivate)
+                    {
+                        <span class="badge rounded-pill text-bg-secondary mb-2">🔒 Private</span>
+                    }
                     <p class="mb-2 community-description">@community.Description</p>
                     <div class="text-muted small">@posts.Count @(posts.Count == 1 ? "post" : "posts"), newest first</div>
 
@@ -51,11 +56,15 @@
                                 @* There's no leave-community service yet, so membership is shown, not toggled. *@
                                 <span class="badge rounded-pill member-badge">✓ Member · @myRole</span>
                             }
+                           else if (hasPendingRequest)
+                            {
+                                <span class="badge rounded-pill text-bg-light border">⏳ Request pending</span>
+                            }
                             else
                             {
                                 <button type="button" class="btn btn-primary rounded-pill join-btn" disabled="@isJoining"
-                                        title="Join to see @community.Name's posts on your Following page" @onclick="JoinAsync">
-                                    @(isJoining ? "Joining..." : "Join")
+                                        @onclick="JoinAsync">
+                                    @(isJoining ? "Working..." : community.IsPrivate ? "Request to join" : "Join")
                                 </button>
                             }
                             @if (!string.IsNullOrEmpty(joinError))
@@ -71,7 +80,98 @@
         {
             <PostComposer CommunityId="CommunityId" OnPosted="LoadAsync" />
         }
+        @if (IsStaff && pendingRequests.Count > 0)
+        {
+            <section class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Join requests (@pendingRequests.Count)</h2>
 
+                    @if (requestError is not null)
+                    {
+                        <div class="alert alert-danger py-2">@requestError</div>
+                    }
+
+                    <ul class="list-group list-group-flush">
+                        @foreach (var req in pendingRequests)
+                        {
+                            <li class="list-group-item d-flex align-items-center gap-3 px-0" @key="req.Id">
+                                <a href="profile/@req.RegularUser.Username" class="author-link flex-fill">
+                                    <strong>@req.RegularUser.FirstName @req.RegularUser.LastName</strong>
+                                    <span class="text-muted">@@@req.RegularUser.Username</span>
+                                </a>
+                                <button type="button" class="btn btn-primary btn-sm"
+                                        disabled="@(handlingRequestId == req.Id)"
+                                        @onclick="() => ApproveAsync(req.Id)">Approve</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm"
+                                        disabled="@(handlingRequestId == req.Id)"
+                                        @onclick="() => RejectAsync(req.Id)">Reject</button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </section>
+        }
+        @if (IsStaff && (postReports.Count > 0 || commentReports.Count > 0))
+        {
+            <section class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Reports (@(postReports.Count + commentReports.Count))</h2>
+
+                    @if (reportError is not null)
+                    {
+                        <div class="alert alert-danger py-2">@reportError</div>
+                    }
+
+                    @foreach (var g in postReports)
+                    {
+                        <div class="border rounded p-3 mb-2" @key="@($"p{g.Post.Id}")">
+                            <div class="d-flex align-items-start gap-2">
+                                <div class="flex-fill">
+                                    <strong>Post by @@@g.Post.RegularUser.Username</strong>
+                                    <span class="badge bg-danger ms-2">@g.ReportCount @(g.ReportCount == 1 ? "report" : "reports")</span>
+                                    <p class="mb-1 mt-1" style="white-space: pre-wrap">@Snip(g.Post.Content)</p>
+                                    <ul class="small text-muted mb-0 ps-3">
+                                        @foreach (var r in g.Reports)
+                                        {
+                                            <li>@@@r.RegularUser.Username: <strong>@r.MissuseName</strong> @r.MissuseDescription</li>
+                                        }
+                                    </ul>
+                                </div>
+                                <div class="d-flex flex-column gap-1">
+                                    <a class="btn btn-sm btn-info" href="post/@g.Post.Id">View</a>
+                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => DismissPostAsync(g.Post.Id)">Dismiss</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @foreach (var g in commentReports)
+                    {
+                        <div class="border rounded p-3 mb-2" @key="@($"c{g.Comment.Id}")">
+                            <div class="d-flex align-items-start gap-2">
+                                <div class="flex-fill">
+                                    <strong>Comment by @@@g.Comment.RegularUser.Username</strong>
+                                    <span class="badge bg-danger ms-2">@g.ReportCount @(g.ReportCount == 1 ? "report" : "reports")</span>
+                                    <p class="mb-1 mt-1" style="white-space: pre-wrap">@Snip(g.Comment.Content)</p>
+                                    <ul class="small text-muted mb-0 ps-3">
+                                        @foreach (var r in g.Reports)
+                                        {
+                                            <li>@@@r.RegularUser.Username: <strong>@r.MissuseName</strong> @r.MissuseDescription</li>
+                                        }
+                                    </ul>
+                                </div>
+                                <div class="d-flex flex-column gap-1">
+                                    <a class="btn btn-sm btn-info" href="post/@g.Comment.PostId">View</a>
+                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => DismissCommentAsync(g.Comment.Id)">Dismiss</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
         <section class="card shadow-sm mb-4">
             <div class="card-body">
                 <h2 class="h5 mb-3">Members (@members.Count)</h2>
@@ -100,6 +200,21 @@
                                         <option value="@r">@r</option>
                                     }
                                 </select>
+                            }
+                            @if (CurrentUser.User is { } viewer)
+                            {
+                                @if (m.RegularUserId == viewer.Id)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                                            disabled="@(removingUserId == m.RegularUserId)"
+                                            @onclick="() => RemoveAsync(m)">Leave</button>
+                                }
+                                else if (IsStaff && (myRole == "Admin" || m.CommunityRole.Role != "Admin"))
+                                {
+                                    <button type="button" class="btn btn-outline-danger btn-sm"
+                                            disabled="@(removingUserId == m.RegularUserId)"
+                                            @onclick="() => RemoveAsync(m)">Remove</button>
+                                }
                             }
                             else
                             {
@@ -147,6 +262,16 @@
     private readonly string[] roleOptions = { "Admin", "Moderator", "Follower" };
     private int? changingRoleFor; // RegularUserId of the member being changed
     private string? roleError;
+    private int? removingUserId;
+    private bool hasPendingRequest;
+    private List<CommunityJoinRequest> pendingRequests = new();
+    private int? handlingRequestId;
+    private string? requestError;
+    private List<GroupedPostReport> postReports = new();
+    private List<GroupedCommentReport> commentReports = new();
+    private string? reportError;
+    private bool IsStaff => myRole == "Admin" || myRole == "Moderator";    
+
 
 
     protected override void OnInitialized()
@@ -176,6 +301,17 @@
     }
     private async Task LoadMembersAsync() =>
     members = await CommunityService.GetCommunityMembersAsync(CommunityId);
+
+    private async Task LoadRequestsAsync(int myId)
+    {
+        hasPendingRequest = false;
+        pendingRequests = new();
+
+        if (myRole is null)
+            hasPendingRequest = await CommunityService.HasPendingRequestAsync(myId, CommunityId);
+        else if (IsStaff)
+            pendingRequests = await CommunityService.GetPendingRequestsAsync(myId, CommunityId);            
+    }
     private async Task LoadAsync()
     {
         isLoading = true;
@@ -202,6 +338,8 @@
                 await LoadLikesAsync(me.Id);
                 myRole = await GetMyRoleAsync(me.Id);
                 await LoadMembersAsync();
+                await LoadRequestsAsync(me.Id);
+                await LoadReportsAsync(me.Id);
             }
         }
         catch (Exception ex)
@@ -220,18 +358,22 @@
 
     private async Task JoinAsync()
     {
-        if (CurrentUser.User is not { } me)
-        {
-            return;
-        }
+        if (CurrentUser.User is not { } me) return;
 
         isJoining = true;
         joinError = null;
         try
         {
-            await CommunityService.JoinCommunityAsync(me.Id, CommunityId);
-            myRole = await GetMyRoleAsync(me.Id); // the service assigns the "Follower" role
-            await LoadMembersAsync();
+            var joined = await CommunityService.JoinCommunityAsync(me.Id, CommunityId);
+            if (joined)
+            {
+                myRole = await GetMyRoleAsync(me.Id);
+                await LoadMembersAsync();
+            }
+            else
+            {
+                hasPendingRequest = true;
+            }
         }
         catch (Exception ex)
         {
@@ -242,7 +384,6 @@
             isJoining = false;
         }
     }
-
     private void SetFollowing(int authorId, bool following)
     {
         // Updates every card by this author, not just the one that was clicked.
@@ -297,4 +438,100 @@
             changingRoleFor = null;
         }
     }
+
+    private async Task ApproveAsync(int requestId)
+    {
+        if (CurrentUser.User is not { } me) return;
+
+        handlingRequestId = requestId;
+        requestError = null;
+        try
+        {
+            await CommunityService.ApproveRequestAsync(me.Id, requestId);
+        }
+        catch (Exception ex)
+        {
+            requestError = ex.Message;
+        }
+        finally
+        {
+            await LoadMembersAsync();
+            await LoadRequestsAsync(me.Id);
+            handlingRequestId = null;
+        }
+    }
+
+    private async Task RejectAsync(int requestId)
+    {
+        if (CurrentUser.User is not { } me) return;
+
+        handlingRequestId = requestId;
+        requestError = null;
+        try
+        {
+            await CommunityService.RejectRequestAsync(me.Id, requestId);
+        }
+        catch (Exception ex)
+        {
+            requestError = ex.Message;
+        }
+        finally
+        {
+            await LoadRequestsAsync(me.Id);
+            handlingRequestId = null;
+        }
+    }
+    private async Task RemoveAsync(CommunityUserRole member)
+    {
+        if (CurrentUser.User is not { } me) return;
+
+        removingUserId = member.RegularUserId;
+        roleError = null;
+        try
+        {
+            await CommunityService.RemoveMemberAsync(me.Id, CommunityId, member.RegularUserId);
+
+            if (member.RegularUserId == me.Id)
+                await LoadAsync();  
+            else
+                await LoadMembersAsync();
+        }
+        catch (Exception ex)
+        {
+            roleError = ex.Message;
+        }
+        finally
+        {
+            removingUserId = null;
+        }
+    }
+    private async Task LoadReportsAsync(int myId)
+    {
+        postReports = new();
+        commentReports = new();
+        if (!IsStaff) return;
+
+        postReports = await MissuseService.GetGroupedPostReportsForCommunityAsync(myId, CommunityId);
+        commentReports = await MissuseService.GetGroupedCommentReportsForCommunityAsync(myId, CommunityId);
+    }
+
+    private async Task DismissPostAsync(int postId)
+    {
+        if (CurrentUser.User is not { } me) return;
+        reportError = null;
+        try { await MissuseService.DismissCommunityPostReportsAsync(me.Id, postId); }
+        catch (Exception ex) { reportError = ex.Message; }
+        finally { await LoadReportsAsync(me.Id); }
+    }
+
+    private async Task DismissCommentAsync(int commentId)
+    {
+        if (CurrentUser.User is not { } me) return;
+        reportError = null;
+        try { await MissuseService.DismissCommunityCommentReportsAsync(me.Id, commentId); }
+        catch (Exception ex) { reportError = ex.Message; }
+        finally { await LoadReportsAsync(me.Id); }
+    }
+
+    private static string Snip(string text) => text.Length <= 100 ? text : text[..100] + "...";
 }

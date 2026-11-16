@@ -82,36 +82,58 @@ public class CommunityService
         return community;
     }
 
-    public async Task JoinCommunityAsync(int userId, int communityId)
+    public async Task<bool> JoinCommunityAsync(int userId, int communityId)
     {
-        // this treats all communities as public. V2 may allow private communities where admin/moderator must admit new users
         await using var db = await _dbFactory.CreateDbContextAsync();
 
-        var alreadyMember = await db.CommunityUserRoles.AnyAsync(r => r.CommunityId == communityId && r.RegularUserId == userId);
-        if (alreadyMember)
+        var community = await db.Communities.FindAsync(communityId);
+        if (community is null)
+            throw new InvalidOperationException("That community doesn't exist.");
+
+        if (await db.CommunityUserRoles.AnyAsync(r => r.CommunityId == communityId && r.RegularUserId == userId))
             throw new InvalidOperationException("You are already a member of this community.");
 
-        var followRole = await db.CommunityRoles.FirstOrDefaultAsync(r => r.Role == "Follower"); 
+        if (community.IsPrivate)
+        {
+            if (await db.CommunityJoinRequests.AnyAsync(r => r.CommunityId == communityId && r.RegularUserId == userId))
+                throw new InvalidOperationException("Your request is already waiting for approval.");
+
+            try
+            {
+                db.CommunityJoinRequests.Add(new CommunityJoinRequest
+                {
+                    CommunityId = communityId,
+                    RegularUserId = userId,
+                    DateRequested = DateTime.UtcNow
+                });
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new InvalidOperationException("Could not send the join request.", ex);
+            }
+            return false;   // request sent, not a member yet
+        }
+
+        var followRole = await db.CommunityRoles.FirstOrDefaultAsync(r => r.Role == "Follower");
         if (followRole is null)
             throw new InvalidOperationException("Follower role not found. Have the roles been seeded?");
- 
-        var communityUserRole = 
-            new CommunityUserRole
+
+        try
+        {
+            db.CommunityUserRoles.Add(new CommunityUserRole
             {
                 CommunityId = communityId,
                 RegularUserId = userId,
                 CommunityRoleId = followRole.Id
-            };
-            
-        try
-        {
-            db.CommunityUserRoles.Add(communityUserRole);
+            });
             await db.SaveChangesAsync();
         }
         catch (DbUpdateException ex)
         {
-            throw new InvalidOperationException("Could not join community. ", ex);
+            throw new InvalidOperationException("Could not join the community.", ex);
         }
+        return true;   // joined
     }
 
     public async Task AssignRoleAsync(int actingUserId, int communityId, int targetUserId, string roleName)
@@ -172,5 +194,115 @@ public class CommunityService
             .OrderBy(r => r.Community.Name)
             .ToListAsync();
     }
+    private static Task<bool> IsStaffAsync(AppDbContext db, int userId, int communityId) =>
+    db.CommunityUserRoles.AnyAsync(r => r.CommunityId == communityId
+        && r.RegularUserId == userId
+        && (r.CommunityRole.Role == "Admin" || r.CommunityRole.Role == "Moderator"));
 
+    public async Task<bool> HasPendingRequestAsync(int userId, int communityId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.CommunityJoinRequests.AnyAsync(r => r.CommunityId == communityId && r.RegularUserId == userId);
+    }
+
+    public async Task<List<CommunityJoinRequest>> GetPendingRequestsAsync(int actingUserId, int communityId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        if (!await IsStaffAsync(db, actingUserId, communityId))
+            throw new InvalidOperationException("Only an admin or moderator can see join requests.");
+
+        return await db.CommunityJoinRequests
+            .Where(r => r.CommunityId == communityId)
+            .Include(r => r.RegularUser)
+            .OrderBy(r => r.DateRequested)
+            .ToListAsync();
+    }
+
+    public async Task ApproveRequestAsync(int actingUserId, int requestId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var request = await db.CommunityJoinRequests.FirstOrDefaultAsync(r => r.Id == requestId);
+        if (request is null)
+            throw new InvalidOperationException("That request no longer exists.");
+
+        if (!await IsStaffAsync(db, actingUserId, request.CommunityId))
+            throw new InvalidOperationException("Only an admin or moderator can approve requests.");
+
+        var followRole = await db.CommunityRoles.FirstOrDefaultAsync(r => r.Role == "Follower");
+        if (followRole is null)
+            throw new InvalidOperationException("Follower role not found. Have the roles been seeded?");
+
+        try
+        {
+            db.CommunityUserRoles.Add(new CommunityUserRole
+            {
+                CommunityId = request.CommunityId,
+                RegularUserId = request.RegularUserId,
+                CommunityRoleId = followRole.Id
+            });
+            db.CommunityJoinRequests.Remove(request);
+            await db.SaveChangesAsync();   // both changes succeed or neither does
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new InvalidOperationException("Could not approve the request.", ex);
+        }
+    }
+
+    public async Task RejectRequestAsync(int actingUserId, int requestId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var request = await db.CommunityJoinRequests.FirstOrDefaultAsync(r => r.Id == requestId);
+        if (request is null)
+            throw new InvalidOperationException("That request no longer exists.");
+
+        if (!await IsStaffAsync(db, actingUserId, request.CommunityId))
+            throw new InvalidOperationException("Only an admin or moderator can reject requests.");
+
+        db.CommunityJoinRequests.Remove(request);
+        await db.SaveChangesAsync();
+    }
+    public async Task RemoveMemberAsync(int actingUserId, int communityId, int targetUserId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var target = await db.CommunityUserRoles
+            .Include(r => r.CommunityRole)
+            .FirstOrDefaultAsync(r => r.CommunityId == communityId && r.RegularUserId == targetUserId);
+        if (target is null)
+            throw new InvalidOperationException("That user is not a member of this community.");
+
+        if (actingUserId != targetUserId)
+        {
+            var actor = await db.CommunityUserRoles
+                .Include(r => r.CommunityRole)
+                .FirstOrDefaultAsync(r => r.CommunityId == communityId && r.RegularUserId == actingUserId);
+
+            if (actor is null || (actor.CommunityRole.Role != "Admin" && actor.CommunityRole.Role != "Moderator"))
+                throw new InvalidOperationException("Only an admin or moderator can remove members.");
+
+            if (target.CommunityRole.Role == "Admin" && actor.CommunityRole.Role != "Admin")
+                throw new InvalidOperationException("Only an admin can remove an admin.");
+        }
+
+        if (target.CommunityRole.Role == "Admin")
+        {
+            var adminCount = await db.CommunityUserRoles
+                .CountAsync(r => r.CommunityId == communityId && r.CommunityRole.Role == "Admin");
+            if (adminCount <= 1)
+                throw new InvalidOperationException("A community must keep at least one admin. Promote someone else first.");
+        }
+
+        try
+        {
+            db.CommunityUserRoles.Remove(target);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw new InvalidOperationException("Could not remove the member.", ex);
+        }
+    }
 }
