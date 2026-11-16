@@ -93,6 +93,68 @@ body.dark-mode .btn-light {
     border-color: var(--mb-border);
 }
 
+body.dark-mode .input-group-text {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .form-control {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .form-control:focus {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-accent);
+    box-shadow: 0 0 0 0.25rem rgba(20, 163, 159, 0.25);
+}
+
+body.dark-mode .form-select {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+}
+
+body.dark-mode .form-select:focus {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-accent);
+    box-shadow: 0 0 0 0.25rem rgba(20, 163, 159, 0.25);
+}
+
+body.dark-mode .form-label {
+    color: var(--text-primary);
+}
+
+body.dark-mode .btn-secondary {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .btn-secondary:hover {
+    background-color: var(--mb-accent-soft);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .list-group-item {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+}
+
+body.dark-mode .form-select-sm {
+    background-color: var(--mb-surface);
+    color: var(--text-primary);
+    border-color: var(--mb-border);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+}
+
 /* Apply variables to elements */
 body {
     background-color: var(--bg-primary);
@@ -299,122 +361,7 @@ h1:focus {
     background-color: var(--mb-surface);
 }
 
-/* Dark mode for modals and the form fields inside them.
-   Bootstrap's --bs-body-color is resolved on :root (light), so inputs need explicit colors here. */
-body.dark-mode .modal-content {
-    --bs-modal-color: var(--mb-text);
-    --bs-modal-header-border-color: var(--mb-border);
-    --bs-modal-footer-border-color: var(--mb-border);
-    color: var(--mb-text);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-}
-
-/* Form fields in dark mode (login page, modals, anywhere else). */
-body.dark-mode label,
-body.dark-mode .form-label {
-    color: var(--mb-text);
-}
-
-body.dark-mode .form-control,
-body.dark-mode .form-select {
-    background-color: var(--mb-canvas);
-    color: var(--mb-text);
-    border-color: var(--mb-border);
-}
-
-body.dark-mode .form-control:focus,
-body.dark-mode .form-select:focus {
-    background-color: var(--mb-canvas);
-    color: var(--mb-text);
-    border-color: var(--mb-accent);
-}
-
-/* Browser autofill would otherwise paint saved usernames/passwords on a light background. */
-body.dark-mode .form-control:-webkit-autofill {
-    -webkit-text-fill-color: var(--mb-text);
-    -webkit-box-shadow: 0 0 0 1000px var(--mb-canvas) inset;
-    caret-color: var(--mb-text);
-}
-
-body.dark-mode .form-select {
-    --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23b0b0b0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
-}
-
-body.dark-mode .form-select option {
+.empty-state {
     background-color: var(--mb-surface);
-    color: var(--mb-text);
-}
-
-body.dark-mode .form-control::placeholder {
-    color: var(--mb-muted);
-}
-
-body.dark-mode .text-danger {
-    color: var(--mb-danger) !important;
-}
-
-body.dark-mode .alert-danger {
-    --bs-alert-color: #ffb3b3;
-    --bs-alert-bg: #3a1c1c;
-    --bs-alert-border-color: #6b2c2c;
-}
-
-body.dark-mode .modal-content .btn-close {
-    filter: invert(1) grayscale(100%) brightness(200%);
-}
-
-body.dark-mode .modal-backdrop.show {
-    opacity: 0.7;
-}
-
-/* Bootstrap pieces that otherwise keep their light-theme colors in dark mode
-   (admin reports page cards, report lists and tabs). */
-body.dark-mode .card {
-    color: var(--mb-text);
-}
-
-body.dark-mode .card-header,
-body.dark-mode .card-footer {
-    background-color: rgba(255, 255, 255, 0.04);
     border-color: var(--mb-border);
-}
-
-body.dark-mode .list-group-item {
-    background-color: var(--mb-surface);
-    color: var(--mb-text);
-    border-color: var(--mb-border);
-}
-
-body.dark-mode .nav-tabs {
-    --bs-nav-tabs-border-color: var(--mb-border);
-    --bs-nav-tabs-link-hover-border-color: var(--mb-border) var(--mb-border) var(--mb-border);
-    --bs-nav-tabs-link-active-color: var(--mb-text);
-    --bs-nav-tabs-link-active-bg: var(--mb-surface);
-    --bs-nav-tabs-link-active-border-color: var(--mb-border) var(--mb-border) var(--mb-surface);
-}
-
-body.dark-mode .nav-tabs .nav-link:not(.active) {
-    color: var(--mb-muted);
-}
-
-body.dark-mode .btn-secondary {
-    --bs-btn-bg: #3a3f45;
-    --bs-btn-border-color: #3a3f45;
-    --bs-btn-hover-bg: #4a5057;
-    --bs-btn-hover-border-color: #4a5057;
-}
-
-body.dark-mode .btn-outline-secondary {
-    --bs-btn-hover-bg: #2a2a2a;
-    --bs-btn-hover-border-color: var(--mb-border);
-}
-
-body.dark-mode .form-check-input:not(:checked) {
-    background-color: var(--mb-canvas);
-    border-color: var(--mb-muted);
-}
-
-body.dark-mode .form-check-input:checked {
-    background-color: var(--mb-accent);
-    border-color: var(--mb-accent);
 }
