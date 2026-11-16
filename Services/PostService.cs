@@ -18,6 +18,7 @@ public class PostService
     }
 
     /// <summary>
+    /// Allows Admin to delete posts as well as allowing users to delete their own posts.
     /// Deletes one of the user's own posts. The database's cascade deletes remove its comments,
     /// likes, follows, hashtag links, reports and notifications; this also deletes its pictures
     /// (rows and files). Reposts of it are kept (every post has its own text) and become
@@ -34,7 +35,15 @@ public class PostService
         if (post is null)
             throw new InvalidOperationException("That post no longer exists.");
         if (post.RegularUserId != userId)
-            throw new InvalidOperationException("You can only delete your own posts.");
+        {
+            var isStaff = post.CommunityId is int cid
+                && await db.CommunityUserRoles.AnyAsync(r => r.CommunityId == cid
+                    && r.RegularUserId == userId
+                    && (r.CommunityRole.Role == "Admin" || r.CommunityRole.Role == "Moderator"));
+
+            if (!isStaff)
+                throw new InvalidOperationException("You can only delete your own posts.");
+        }
 
         var media = post.PostMedia.Select(pm => pm.Media).ToList();
 
@@ -81,7 +90,11 @@ public class PostService
             throw new ArgumentException("A post cannot exceed 500 characters");
 
         await using var db = await _dbFactory.CreateDbContextAsync();
-
+        if (communityId is int cid &&
+            !await db.CommunityUserRoles.AnyAsync(r => r.CommunityId == cid && r.RegularUserId == userId))
+        {
+            throw new InvalidOperationException("Join this community before posting in it.");
+        }
         // Reuse hashtags that already exist; create the rest.
         var existingTags = await db.HashTags
             .Where(h => tagNames.Contains(h.Name.ToLower()))
@@ -207,7 +220,11 @@ public class PostService
             throw new ArgumentException("A post cannot exceed 500 characters");
 
         await using var db = await _dbFactory.CreateDbContextAsync();
-
+        if (communityId is int cid &&
+            !await db.CommunityUserRoles.AnyAsync(r => r.CommunityId == cid && r.RegularUserId == userId))
+        {
+            throw new InvalidOperationException("Join this community before posting in it.");
+        }
         var post = new Post
         {
             RegularUserId = userId,

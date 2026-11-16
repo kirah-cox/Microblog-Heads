@@ -239,6 +239,7 @@
                 <PostCard Post="post" @key="post.Id" LikedPostIds="likedPostIds" LikedCommentIds="likedCommentIds"
                           IsFollowingAuthor="followingIds.Contains(authorId)"
                           OnFollowToggled="following => SetFollowing(authorId, following)"
+                      CanModerate="IsStaff"
                       OnDeleted="() => PostCard.RemoveDeleted(posts, post.Id)" />
             }
         }

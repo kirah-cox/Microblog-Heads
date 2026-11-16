@@ -1,3 +1,5 @@
+@using System.Runtime.InteropServices
+@using Microsoft.EntityFrameworkCore.Query
 @using microblog_heads.Models
 @inject PostService PostService
 @inject CommentService CommentService
@@ -130,7 +132,7 @@
                         @RepostIcon <span class="action-label">Repost</span>
                     </button>
 
-                    @if (IsOwnPost)
+                    @if (IsOwnPost || CanModerate)
                     {
                         <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none action delete-btn"
                                 title="Delete this post" disabled="@isDeleting" @onclick="StartDelete">
@@ -613,7 +615,7 @@ private async Task OpenReportModal()
 
     /// <summary>Raised after this post is deleted. List pages call RemoveDeleted(posts, post.Id).</summary>
     [Parameter] public EventCallback OnDeleted { get; set; }
-
+    [Parameter] public bool CanModerate {get; set;}
     private bool confirmingDelete;
     private bool isDeleting;
     private string? deleteError;
